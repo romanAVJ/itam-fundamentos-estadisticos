@@ -359,7 +359,26 @@ estimación del error.
 ## 300 estratos = 300 muestras independientes 
 ## Bootstrap de Rao y Wu
 
-replicas= numeric(1000)
+# Función para calcular p gorro en una sola muestra bootstrap 
+
+calcular_p_gorro <- function() {
+  p_gorro_si <- sum(tabla_ponderada_si$Suma_si_confactor) / sum(tabla_ponderada_si$Suma_total_confactor)
+  
+  p_gorro_no <- sum(tabla_ponderada_no$Suma_no_confactor) / sum(tabla_ponderada_no$Suma_total_confactor)
+  
+  p_gorro_nulos <- sum(tabla_ponderada_nulos$Suma_nulos_confactor) / sum(tabla_ponderada_nulos$Suma_total_confactor)
+  
+  return(c(p_gorro_si, p_gorro_no, p_gorro_nulos))
+}
+resultados_bootstrap <- calcular_p_gorro()
+
+set.seed(8373647)  
+
+num_bootstrap_samples <- 1000
+
+resultados_bootstrap <- replicate(num_bootstrap_samples, {
+calcular_p_gorro()
+})
 
 
 
