@@ -151,12 +151,100 @@ df_muestra <- read_delim("https://ine.mx/wp-content/uploads/2021/08/Conteos-Cons
   mutate(n = n()) |> 
   ungroup()
 
-# get estimate of combined ratio of votes
-df_combined_ratio |> 
+# get estimate of combined ratio of votes #
+# step 0: get total votes by polling booth
+df_muestra_by_polling_booth  <- df_muestra |> 
+    group_by(ID_CASILLA, ESTRATO) |>
+    summarise(across(c(SI, NO, NULOS, TOTAL), sum), num_obs = n())  |> 
+    arrange(ESTRATO, ID_CASILLA) |> 
+    group_by(ESTRATO) |>
+    mutate(num_polling_booths = n()) |> 
+    ungroup()
+df_muestra_by_polling_booth
 
+# step 1: get Nh / nh
+df_polling_booths_total  <- df_computos |> count(ESTRATO) |> rename(Nh = n)
+df_polling_booths_selected  <- df_muestra_by_polling_booth |> group_by(ESTRATO) |> summarise(nh = sum(num_obs))
+df_polling_booths  <- df_polling_booths_total |> 
+    inner_join(df_polling_booths_selected, by = "ESTRATO") |> 
+    mutate(Nh_nh = Nh / nh) |> 
+    select(ESTRATO, Nh_nh)
 
+df_polling_booths
 
+# step 2: get total votes expanded, i.e. sum(Nh_nh * sum_{ID_CASILLA}(TOTAL))
+df_total_votes  <- df_muestra_by_polling_booth |> 
+    inner_join(df_polling_booths, by = "ESTRATO") |> 
+    mutate(weighted_total_votes = TOTAL * Nh_nh)
 
+df_total_votes
+
+total_expanded_votes  <- sum(df_total_votes$weighted_total_votes)
+
+# step 3: get total votes expanded by option
+df_total_votes_by_option  <- df_muestra_by_polling_booth |> 
+    pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", values_to = "VOTOS") |> 
+    inner_join(df_polling_booths, by = "ESTRATO") |>
+    mutate(weighted_total_votes = VOTOS * Nh_nh)
+
+df_total_votes_by_option
+
+# step 4: get estimate of combined ratio of votes
+table_combined_ratios  <- df_total_votes_by_option |> 
+    group_by(OPCION) |> 
+    summarise(combined_ratio = sum(weighted_total_votes) / total_expanded_votes)
+# print table in html with percentage format
+knitr::kable(
+    table_combined_ratios, digits = 4, 
+    format.args = list(big.mark = ",", decimal.mark = ".", format = "f"), 
+    caption = "Tabla de razones combinadas de votos en la muestra"
+    )
+
+# create a bootstrap function to get the combined ratio of votes #
+get_combined_ratio  <- function(df, df_polling_booths){
+    # step 1: get total votes expanded
+    total_expanded_votes  <- df |> 
+        inner_join(df_polling_booths, by = "ESTRATO") |> 
+        mutate(weighted_total_votes = TOTAL * Nh_nh) |> 
+        pull(weighted_total_votes) |>
+        sum()
+
+    # step 2: get combined ratios expanded by option
+    df_total_votes_by_option  <- df |> 
+        pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", values_to = "VOTOS") |> 
+        inner_join(df_polling_booths, by = "ESTRATO") |>
+        mutate(weighted_total_votes = VOTOS * Nh_nh) |> 
+        group_by(OPCION) |>
+        summarise(combined_ratio = sum(weighted_total_votes) / total_expanded_votes)
+
+    return(df_total_votes_by_option)
+}
+# look if function works
+df_total_votes_by_optionv2  <- get_combined_ratio(df_muestra_by_polling_booth, df_polling_booths) # is ok!
+
+# create bootstrap function
+svy_boot  <- function(df_sample, df_polling){
+    # get sample of polling booths BY ESTRATO
+    df_sample_by_estrato  <- df_sample |> 
+        group_split(ESTRATO) |> 
+        map_df(~ slice_sample(.x, n = num_polling_booths - 1, replace = TRUE))
+        # slice_sample(n = num_polling_booths - 1, replace = TRUE) |> # rao & wu 
+        # ungroup()
+    
+    # get combined ratio of votes
+    df_combined_ratio  <- get_combined_ratio(df_sample_by_estrato, df_polling)
+    return(df_combined_ratio)
+}
+
+# generate bootstrap samples
+set.seed(SEED)
+N_BOOT  <- 1000
+df_bootstrap_combined_ratio  <- map_df(1:N_BOOT, ~ svy_boot(df_muestra_by_polling_booth, df_polling_booths) |> 
+    rename(BOOT = .x))
+
+df_muestra_by_polling_booth|> 
+        group_by(ESTRATO) |> 
+        mutate(num_polling_booths = n())
 
 
 
