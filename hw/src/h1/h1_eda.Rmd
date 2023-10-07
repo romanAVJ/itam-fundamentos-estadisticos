@@ -1,0 +1,457 @@
+---
+title: 'Tarea 1: Román Vélez'
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r libraries}
+library(tidyverse)
+library(rcompanion)
+```
+
+# Tarea 1.1: Ejercicio de Propinas
+
+Read data
+
+```{r 1.load-data, warning=FALSE}
+df_tips <- read_csv("data/tips.csv")
+
+# look data
+glimpse(df_tips)
+
+```
+
+Change some factors
+
+```{r 1.show-factors}
+df_tips$day |> unique()
+```
+
+Wrangle data
+
+```{r 1.wrangle-tips-data}
+df_tips <- df_tips %>% 
+  mutate(day  = fct_relevel(day, c("Thur", "Fri", "Sat", "Sun")))
+```
+
+## Q1.1: Get percentiles of the tips with min and max
+
+Get the deciles of the tips variable 2. Get range (max & min)
+
+```{r 1.1percintiles}
+tibble(tip = df_tips$tip |> quantile(p=0:10/10), q = 0:10)
+
+
+```
+
+The min is of \$1 and the max is of \$10.
+
+## Q1.2: Quantile Graph
+
+```{r}
+aux <- ecdf(df_tips$tip)
+aux
+```
+
+```{r 1.2-quantile-graph}
+df_tips |> 
+  mutate(
+    rank = rank(tip, ties.method = "first"),
+    f = rank/n()
+  ) |> 
+  ggplot(aes(f, tip)) +
+  geom_point() +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_continuous(labels = scales::percent) +
+  xlab("Quantile") + ylab("Tip") +
+  ggtitle("Quantile distribution of the tips", "In USD") +
+  theme_bw()
+  
+
+
+```
+
+## Q1.3 Histogram of tips
+
+```{r 1.3histogram}
+df_tips |> 
+  ggplot(aes(tip)) +
+  geom_histogram(aes(y=..density..), alpha = 0.5, fill = "steelblue", color = "gray50") +
+  geom_density(color = "black") +
+  scale_x_continuous(labels = scales::dollar) +
+  xlab("Density") + ylab("Tip") +
+  ggtitle("Distribution of the tips", "In USD") +
+  theme_bw()
+
+```
+
+## Q1.4: Tip vs Total Bill
+
+Extra: added a loess representation of the data.
+
+```{r 1.4 tip-vs-bill}
+df_tips |> 
+  ggplot(aes(tip, total_bill)) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Tip") + ylab("Total Bill") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_continuous(labels = scales::dollar) +
+  ggtitle("Tip vs Bill", "In USD") +
+  theme_bw()
+
+```
+
+Look if the tip as a percentage shows a different phenomena. Looks like a negative exponential phenomena (it will be studied furthermore in the following sections).
+
+```{r 1.4.2 tip-vs-bill}
+df_tips |> 
+  ggplot(aes(total_bill, tip/total_bill)) +
+  geom_point() +
+  geom_smooth() +
+  geom_smooth(method = "lm", color = 'red', se = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::dollar) +
+  ggtitle("Tip vs Bill", "In USD") +
+  xlab("Total Bill") + ylab("Tip (as %)") +
+  theme_bw()
+
+```
+
+## Q1.5: Tip as a % of the total bill
+
+```{r 1.5-percent-bill}
+# get % of the bill as a tip
+df_tips <- df_tips |> 
+  mutate(
+    tip_percentage = tip/total_bill
+  )
+
+# get some quantiles
+tibble(
+  tip_percentage = quantile(df_tips$tip_percentage, p = 0:10/10),
+  quantile = 0:10
+)
+
+```
+
+## Q1.6: Histogram of the tip´
+
+```{r 1.6-histogram-tip-defalut-bw}
+df_tips |> 
+  ggplot(aes(tip_percentage)) +
+  geom_histogram(aes(y=..density..), alpha = 0.5, fill = "deeppink", color = "gray50") +
+  geom_density(color = "black") +
+  scale_x_continuous(labels = scales::percent) +
+  xlab("Density") + ylab("Tip") +
+  ggtitle("Distribution of the tips", "As percentage of the total bill") +
+  theme_bw()
+```
+
+Use some `bw` methods for the density with "solve the equation". Use Sheather & Jones defualt method.
+
+```{r 1.6-histogram-tip-selector}
+tips_percent <- df_tips$tip_percentage
+
+df_tips |> 
+  ggplot(aes(tip_percentage)) +
+  geom_histogram(aes(y=..density..), alpha = 0.5, fill = "deeppink", color = "gray50", binwidth = bw.SJ(tips_percent)) +
+  geom_density(color = "black", bw = "SJ") +
+  scale_x_continuous(labels = scales::percent) +
+  xlab("Density") + ylab("Tip") +
+  ggtitle("Distribution of the tips", "As percentage of the total bill. SJ bw.") +
+  theme_bw()
+```
+
+## Q1.7: Describe the tip as % of the bill
+
+```{r 1.7.1-general description}
+# brief summary
+df_tips |> pull(tip_percentage) |> summary()
+cat("\n")
+cat(df_tips |> pull(tip_percentage) |>  IQR())
+cat("\n")
+cat(df_tips |> pull(tip_percentage) |>  sd())
+
+
+
+```
+
+- Generally speaking, the distribution looks a little right skewed. Half of the tips are between 13% and 19% of the total bill, with an average of 15.5% per total bill payed. This numbers makes sense with respect to the American Culture.
+
+- Some possible outliers at the end of the right tail could be due to a very low total bill, hence the extremity.
+
+Lets look if there are some outliers
+
+```{r 1.7.2-outlier-detector}
+# get tips as percentage
+tips_percent <- df_tips$tip_percentage
+
+# univariate analysis
+lower_whisker <- quantile(tips_percent, 0.25) - 1.5 * IQR(tips_percent) 
+upper_whisker <- quantile(tips_percent, 0.75) + 1.5 * IQR(tips_percent)
+
+# lower outlier
+l_outlier <- tips_percent[tips_percent < lower_whisker]
+u_outlier <- tips_percent[tips_percent > upper_whisker]
+outliers <- cbind(l_outlier, u_outlier)
+
+# look oultliers
+cat(outliers |> sort())
+
+# plot boxplot & cloud points
+df_tips |> 
+  mutate(
+    is_outlier = ifelse(tip_percentage > upper_whisker, 1, 0) |> as_factor()
+  ) |> 
+  ggplot() +
+  geom_boxplot(aes(tip_percentage)) +
+  geom_jitter(aes(tip_percentage, 0, color = is_outlier), height = 0.2, width = 0, alpha = 0.7) +
+  xlab("Tips as % of the Bill") + ylab("") +
+  scale_x_continuous(labels = scales::percent, limits = c(0,1)) +
+  scale_color_manual(breaks = c("0", "1"), values = c("gray", "red")) +
+  ggtitle("Distribution of the tips", "As percentage of the total bill. SJ bw.") +
+  theme_bw() +
+  theme(
+    axis.text.y = element_blank()
+  )
+
+```
+Using a regression to look in a more robust way which data can have leverage.
+
+```{r 1.6.3 mlr}
+# fit an lm for the tips
+fit_lm <- lm(
+  data = df_tips,
+  formula = "tip_percentage ~ . -tip"
+)
+
+# summary
+summary(fit_lm)
+
+```
+
+Looks like only the total bill is a linear factor of the % of the tip. L Lets look for some confidence ellipses.
+
+```{r 1.6-ellipses-outlier}
+df_tips |> 
+  ggplot(aes(total_bill, tip/total_bill)) +
+  geom_point() +
+  stat_ellipse(type = "norm", level = 0.99) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::dollar) +
+  ggtitle("Tip vs Bill", "In USD") +
+  xlab("Total Bill") + ylab("Tip (as %)") +
+  theme_bw()
+
+```
+
+At the end (not taking in account the "outliers" of the `total bill`), the 2 points of \~40\% and \~70\% as \% of the bill look like outliers for the joint distribution.
+
+## Q1.8 Outliers-Detector
+
+As we saw, there are 2 possible outliers. Lets look them with more detail
+
+```{r 1.8-outliers}
+df_tips |> 
+  mutate(
+    tip_percentage = tip/total_bill,
+    is_outlier = ifelse(tip_percentage > upper_whisker, 1, 0) |> as_factor()
+  ) |> 
+  filter(
+    is_outlier == "1", tip_percentage > 0.4
+  ) |> 
+  arrange(
+    tip
+  )
+
+
+```
+
+It looks that it doesn't matter if they are boys or girls for the outlier to happen. It is common in both that the day of the bill was on sunday, but this are reeeeally few observation, so we can't conclude a lot (frequentist speaking).
+
+## Q 1.9: Boxplot for tips
+
+```{r 1.9-boxplot-tips}
+# plot boxplot & cloud points
+df_tips |> 
+  ggplot(aes(tip, time, color = time)) +
+  geom_boxplot() +
+  scale_x_continuous(labels = scales::dollar) +
+  ggtitle("Tip by time of the day", "In USD") +
+  xlab("Tip") + ylab("Time of the Day") +
+  theme_bw() +
+  theme(
+    axis.text.y = element_text(angle = 90, hjust = 0.5, face = "bold"),
+    legend.position = "None"
+  )
+
+# ecdf 
+df_tips |> 
+  ggplot(aes(tip, color = time)) +
+  stat_ecdf() +
+  scale_x_continuous(labels = scales::dollar) +
+  ggtitle("Tip by time of the day", "In USD") +
+  xlab("Tip") + ylab("Time of the Day") +
+  theme_bw() +
+  theme(
+    axis.text.y = element_text(angle = 90, hjust = 0.5, face = "bold"),
+  )
+
+```
+
+By the box plot & the ECD, it looks that the time of the day affects the total tip payed. To be sure this is not false, lets do a hypothesis test (a non parametric one, 'cause the tip can't be normal distributed given the above data descriptions) if the dinner has a higher tip than in lunch.
+
+```{r 1.9-stat-test}
+df_tips <- df_tips |> 
+  mutate(
+    time = fct_relevel(time, c("Lunch", "Dinner"))
+  )
+
+wilcox.test(tip ~ time, data = df_tips, alternative = "less", conf.level = 0.95)
+
+```
+
+It looks that there is evidence to think that the tips at lunch are lower that at dinner. But is this causal by itself or there can be an intermediate factor that affects this relationship? We looked that in the multinomial regression the tip as a % of the bill was not directly correlated to the time of the day but to the size itself of the bill.
+
+```{r 1.9-tip-bill-day}
+df_tips |> 
+  ggplot(aes(tip, total_bill, color = time)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlab("Tip") + ylab("Total Bill") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_continuous(labels = scales::dollar) +
+  ggtitle("Tip vs Bill", "In USD. By Time of the day") +
+  theme_bw()
+
+
+```
+
+It clearly doesn't look that the time of the day is determinant for the tip size but the size itself of the bill.
+
+# Q2: Tea
+
+```{r 2-load-data}
+df_tea <- read_csv("data/tea.csv")
+
+# look data
+glimpse(df_tea)
+
+```
+
+## Q2.1: Create a cross-table with the type of sugar and tea
+
+```{r 2.1-sugar-tea}
+df_tea |> 
+  count(Tea, sugar) |> 
+  pivot_wider(
+    id_cols = Tea,
+    names_from = sugar,
+    values_from = n
+  )
+
+```
+
+## Q2.2: Relationship of sugar & tea
+
+It looks that the majority of the people tend to prefer no sugar for *black* and *green* tea, however for *earl grey* it looks that people prefer to add sugar to their teas.
+
+```{r 2.2-percent-table}
+df_tea |> 
+  count(Tea, sugar) |> 
+  group_by(Tea) |> 
+  mutate(
+    percent = n/sum(n)
+  ) |> 
+  ungroup() |> 
+  pivot_wider(
+    id_cols = Tea,
+    names_from = sugar,
+    values_from = percent
+  )
+
+```
+
+## Q2.3: Cross table tea & how (presentation)
+
+```{r 2.1-how-tea}
+df_tea |> 
+  count(Tea, how) |> 
+  pivot_wider(
+    id_cols = how,
+    names_from = Tea,
+    values_from = n
+  )
+```
+
+## Q2.4: Percentage table tea & how (presentation)
+
+```{r 2.1-how-tea-percentage}
+df_tea |> 
+  count(Tea, how) |> 
+  group_by(how) |> 
+  mutate(
+    percent = n/sum(n)
+  ) |> 
+  ungroup() |> 
+  pivot_wider(
+    id_cols = how,
+    names_from = Tea,
+    values_from = percent
+  )
+
+```
+
+## Q2.5: Differences between tea drinkers regarding presentation
+
+-   By the above table, it looks that, given tea bag, people tend to prefer earl grey teas.
+-   For the unpacked tea bags drinkers, it looks they prefer earl grey teas.
+-   For unpacked, it looks that black and green tees are more prefered than in other presentations. But earl grey still dominating.
+
+The earl gray domination in each presentation value can be dued to the fact that there are more observation of it than the other types of teas.
+
+```{r 2.5-check-earl-grey}
+df_tea |> 
+  count(Tea)
+
+```
+
+```{r 2.5-check-earl-grey-independence}
+# v crammer test
+cramerV(
+  x = df_tea$Tea,
+  y = df_tea$how
+)
+
+# contgency table
+df_tea |> 
+  count(Tea, how) |> 
+  rename(
+    obs = n
+  ) |> 
+  group_by(
+    how
+  ) |> 
+  mutate(
+    n_how = sum(obs)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    chisq_i = (obs - n_how * 1/3)^2 / (n_how * 1/3)
+  ) |> 
+  pivot_wider(
+    id_cols = how,
+    names_from = Tea,
+    values_from = chisq_i
+  ) |> 
+  mutate(
+    chisq = black + `Earl Grey` + green,
+    p_chisq = pchisq(chisq, df = 3, lower.tail = FALSE)
+  )
+  
+
+```
+
+It looks like a week correlation between presentation & type of tea on unpacked bags, but for packed there is no evidence, therefore we can assert that people prefer earl grey over the other types of tea.

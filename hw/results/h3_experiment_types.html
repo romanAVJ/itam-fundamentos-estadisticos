@@ -1,0 +1,85 @@
+<h1 id="homework-3-type-of-experiments">Homework 3: Type of experiments</h1>
+<p><span class="citation" data-cites="roman_avj">@roman_avj</span></p>
+<hr />
+<h2 id="question-1">Question 1:</h2>
+<p>En 1930 se realizó un experimento en 20,000 niños de edad escolar de Inglaterra. Los maestros fueron los responsables de asignar a los niños de manera aleatoria al grupo de tratamiento -que consistía en recibir 350 ml de leche diaria - o al grupo de control, que no recibía suplementos alimenticios. Se registraron peso y talla antes y después del experimento. El estudio descubrió que los niños que recibieron la leche ganaron más en peso en el lapso del estudio. Una investigación posterior descubrió que los niños del grupo control eran de mayor peso y talla que los del grupo de intervención, antes de iniciar el tratamiento. ¿Qué pudo haber ocurrido? ¿Podemos utilizar los resultados del estudio para inferir causalidad?</p>
+<pre class="{txt}"><code>v1:
+NOTAS
+1. 20k de edad escolar en inglaterra
+2. profes asignan niños &quot;aleatoriamente&quot;
+3. experimento: dar leche vs no
+4. hipotesis: el experimento afecta el peso y talla
+5. efectos: peso y talla previo al experimento
+
+PLANTEAMIENTO
+1. Ocurrencias:
+  a. Por pura aleatoriedad el peso y talla son mayor. Será significativamente mayor?
+  b. Sesgos de los profesores. Seleccionaron por peso menor y peso mayor
+2. Causalidad.
+  a. Se cumple selección aleatoria en inglaterra, es una población aún más grande.
+  b. Quizá se viole la asignación aleatoria para grupo control y tratamiento
+  c. Faltaría controlar efectos, puede suceder
+    i. Niños del grupo tratamiento tenían menor edad y por ende crecieron
+    ii. Falta especificar lapso de tiempo
+    iii. Importancia del sexo</code></pre>
+<h2 id="question-2">Question 2:</h2>
+<p>Supongamos que de los registros de un conjunto de doctores se selecciona una muestra aleatoria de individuos americanos caucásicos y de americanos de ascendencia china, con el objetivo de comparar la presión arterial de las dos poblaciones. Supongamos que a los seleccionados se les pregunta si quieren participar y algunos rechazan. Se compara la distribución de presión arterial entre los que accedieron a participar. ¿En que cuadro cae este estudio? ¿Qué supuesto es necesario para permitir inferencias a las poblaciones muestreadas?</p>
+<pre class="{text}"><code>v1.
+NOTAS
+1. Selección aleatoria de dos poblaciones.
+2. Asignación no aleatoria, pues se les pregunta.
+3. Comparar presión arterial
+
+PLANTEAMIENTO
+Cae en el grupo del cuadro de solo descripción de las poblaciones.
+Para hacer inferencia se debería seleccionar de forma aleatoria sujetos de ambas poblaciones.</code></pre>
+<h2 id="question-3">Question 3:</h2>
+<p>Un grupo de investigadores reportó que el consumo moderado de alcohol estaba asociado con un menor riesgo de demencia (Mukamal et al. (2003)). Su muestra consistía en 373 personas con demencia y 373 sin demencia. A los participantes se les pregintó cuánta cerveza, vino, o licor consumían. Se observó que aquellos que consumían de 1-6 bebidas por semana tenían una incidencia menor de demencia comparado a aquellos que se abstenían del alcohol. ¿se puede inferir causalidad?</p>
+<pre class="{text}"><code>v1.
+NOTAS
+1. Consumo moderado alcohol --&gt; menor demencia
+2. Muestra de 373 con demencia y 373 sin demencia
+3. Controles
+  a. cerveza
+  b. vino
+  c. licor
+4. Rango 1-6 menor demencia vs abstinencia
+
+PLANTEAMIENTO
+1. Selección no aleatoria debido a que las poblaciones son autodeterminadas a priori al experimento
+2. Asignación no es aleatoria debido a que los grupos se forman de forma ajena al experimento
+
+Es una descripción de los grupos, no existe aleatoriedad sobre el tratamienta, la relación entre alcohol y demencia es probablemente espuria.</code></pre>
+<h2 id="question-4">Question 4:</h2>
+<p>Un estudio descubrió que los niños que ven más de dos horas diarias de televisión tienden a tener mayores niveles de colesterol que los que ven menos de dos horas diarias. ¿Cómo se pueden utilizar estos resultados?</p>
+<pre class="{text}"><code>v1.
+NOTAS
+1. Colesterol
+2. Niños con +2 horas de televisión
+
+PLANTEAMIENTO
+1. Selección no aleatoria debido a que las poblaciones se determinan solas.
+2. Asignación no aleatoria por el mismo punto anterior.
+
+Es descripción sobre dos poblaciones. Es posible que existan variables que alteren el colesterol en los niños más allá de ver televisión, como hacer ingesta de alimentos de altas grasas saturadas mientras ven la televisión.</code></pre>
+<h2 id="question-5">Question 5:</h2>
+<p>Más gente se enferma de gripa en temporada de invierno, ¿esto prueba que las temperaturas bajas ocasionan las gripas? ¿Qué otras variables podrían estar involucradas?</p>
+<pre class="{text}"><code>v1.
+NOTAS
+1. Gripa
+2. Invierno
+
+PLANTEAMIENTO
+Selección aleatoria sobre asignación no aleatoria. Esto es un clave indicador que existe una relación entre temperatura y gripa, sin embargo no prueban la implicación causal puesto que la asignación no es aleatoria. Se deberían controlar más factores como el ejercicio que se hace en época de frio, la alimentación en épocas de frío, etc.</code></pre>
+<h2 id="question-6">Question 6:</h2>
+<p>¿Cuál es la diferencia entre un experimento aleatorizado y una muestra aleatoria?</p>
+<pre class="{text}"><code>v2.
+- Experimento aleatorizado: es un experimento el cual involucra selección aleatorizada de individuos de una población específica para poder hacer inferencias sobre un tratamiento en esa población
+
+- Muestra aleatoria: es una selección aleatorizada de una población más grande para poder hacer inferencia sobre la población total.
+
+~v1.
+- Experimento aleatorizado: a partir de una asignación aleatoria de poblaciones y de grupos, se encuentran diferencias en los grupos afectados vs no afectados por el experimento.
+
+- Muestra aleatoria: es una medición de una selección aleatorizada de poblaciones.~
+</code></pre>

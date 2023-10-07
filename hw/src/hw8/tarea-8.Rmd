@@ -1,0 +1,235 @@
+---
+title: "Tarea-08"
+author: "Roman Alberto Velez Jimenez"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(latex2exp)
+# knitr::opts_chunk$set(echo = FALSE, error = TRUE, include = TRUE)
+```
+
+
+Iniciamos la tarea estableciendo una semilla para el generador de números aleatorios.
+
+```{r}
+set.seed(38972938)
+```
+
+
+### Cobertura
+
+Supón que estamos interesados en entender como es el tráfico de llamadas a un conmutador, antes de realizar el estudio hacemos un análisis de simulación para estudiar el comportamiento de nuestro estimador bajo el supuesto que las llamadas al conmutador siguen un proceso $Poisson(\lambda)$. 
+
+En este ejemplo la cantidad de interés es $P(X=0)^2 = e^{-2\lambda}$ que corresponde a la probabilidad de que no se reciban llamadas en 2 minutos.
+
+Entonces el parámetro de interés $\theta=e^{-2\lambda}$ que estimaremos con el estimador plug-in $\hat{\theta}=e^{-2\bar{X}}$.
+
+Sigue el siguiente proceso:
+
+i) Genera una muestra aleatoria de tamaño n = 50 de una distribución Poisson con parámetro $\lambda = 3$ (revisa la función rpois).
+
+```{r rand-sample}
+# generate
+xpoiss <- rpois(n = 50, lambda = 3)
+
+# plot
+qplot(xpoiss, geom = "histogram") +
+  ggtitle("Random Poisson Sample", TeX("$\\lambda = 3$"))
+
+```
+
+ii) Genera 1000 muestras bootstrap y calcula intervalos de confianza del 95\%  para $\hat{\theta}$ usando 1) el método normal y 2) percentiles.
+
+```{r boot-plug-in}
+# plug-in
+plugin_poiss <- function(x) return(exp(-2 * mean(x)))
+
+# bootstrap
+B <- 1000
+plug_boot <- sapply(1:B, function(i) plugin_poiss(sample(xpoiss, size = length(xpoiss), replace = TRUE)))
+
+# plot
+qplot(plug_boot, geom = "histogram") +
+  ggtitle("Bootstrap Distribution", TeX("$ P[X = 0]^{2}$")) +
+  scale_x_continuous(labels = scales::percent)
+
+# CI
+std_boot <- sd(plug_boot)
+alpha <- 0.05
+cinorm <- c(mean(plug_boot) + qnorm(alpha/2)*std_boot, mean(plug_boot) + qnorm(1-alpha/2)*std_boot)
+ciperc <- quantile(plug_boot, p = c(alpha/2, 1-alpha/2))
+
+knitr::kable(
+  tibble(
+    norm = cinorm,
+    perc = ciperc,
+    type = c("lower", "upper")
+  )
+)
+
+```
+
+iii) Revisa si el intervalo de confianza contiene el verdadero valor del parámetro, en caso de que no lo contenga registra si falló por la izquierda  o falló por la derecha, así como la longitud del intervalo.
+
+```{r look-ci}
+# true value
+trueval <- ppois(q = 0, lambda = 3)**2
+
+# plot
+tibble(
+  x = replicate(2, mean(plug_boot)),
+  low = c(cinorm[1], ciperc[1]),
+  up = c(cinorm[2], ciperc[2]),
+  type = c("norm", "perc")
+) |> 
+  ggplot(aes(type, ymin = low, ymax = up, color = type)) +
+  geom_linerange() +
+  geom_point(aes(y = trueval), color = "red", size = 6) +
+  geom_point(aes(y = mean(plug_boot)), color = "blue") +
+  geom_hline(yintercept = 0, linetype = 2) +
+  ggtitle("Confidence Intervals", TeX("$ P[X = 0]^{2}$")) +
+  scale_y_continuous(labels = scales::percent) +
+  annotate("text", x = 0.7, y = 0.0025, label = "Blue point: boostrap. Red point: sample") +
+  coord_flip()
+```
+
+a) Repite el proceso descrito 500 veces y llena la siguiente tabla:
+
+Método     | \% fallo izquierda   | \% fallo derecha  | cobertura | Longitud promedio de intervalo
+-----------|----------------------|-------------------|------------------------
+Normal     |                      |                   |.          |
+Percentiles|                      |                   |           |
+
+La columna cobertura es una estimación de la cobertura del intervalo basada en 
+las simulaciones, para calcularla simplemente escribe el porcentaje de los 
+intervalos que incluyeron el verdadero valor del parámetro. Recuerda usar la 
+semilla.
+
+```{r coverage}
+get_coverage <- function(x, realx, n, B){
+  # plugin as function
+  plug_boot_fun <- function(i, x, B) {
+    # sample
+    boot_sample <- sapply(1:B, function(z) plugin_poiss(sample(x, size = length(x), replace = TRUE)))
+    
+    # ci
+    alpha <- 0.05
+    mean_boot <- mean(boot_sample)
+    std_boot <- sd(boot_sample)
+    cinorm <- c(mean_boot + qnorm(alpha/2)*std_boot, mean_boot + qnorm(1-alpha/2)*std_boot)
+    ciperc <- quantile(boot_sample, p = c(alpha/2, 1-alpha/2))
+    
+    # return tibble
+    df_return <- tibble(
+      estimate = mean_boot,
+      ci = c(cinorm, ciperc),
+      part_ci = rep(c("lower", "upper"), times = 2),
+      type_ci = rep(c("normal", "percentile"), times = 2*c(1, 1)),
+      num_sample = i
+    )
+    return(df_return)
+  }
+  
+  # generate n confidence intervals
+  tibble_ci <- map_df(1:n, plug_boot_fun, x = x, B = B) |> 
+    group_by(num_sample, type_ci) |>
+    mutate(
+      failure = factor(ifelse((realx < ci[part_ci == "lower"]) | (realx > ci[part_ci == "upper"]), "yes", "no"))
+    )
+  
+  # get failures
+  tibble_smry <- tibble_ci |>
+    group_by(num_sample, type_ci) |>
+    summarise(
+      failure_left = ifelse(realx < ci[part_ci == "lower"], 1, 0),
+      failure_right = ifelse(realx > ci[part_ci == "upper"], 1, 0),
+      long = diff(range(ci)),
+      lower = ci[part_ci == "lower"],
+      upper = ci[part_ci == "upper"]
+    ) |> 
+    group_by(type_ci) |> 
+    summarise(
+      num_sims = n,
+      num_failure_left = sum(failure_left),
+      num_failure_right = sum(failure_right),
+      mean_long = mean(long),
+      min_up = min(upper),
+      max_low = max(lower)
+    )  |> 
+    ungroup() |> 
+    mutate(
+      coverage = (n - (num_failure_left + num_failure_right)),
+      perc_coverage = 100 * (coverage / n)
+      )
+  
+  return(list(df_boot = tibble_ci, df_coverage = tibble_smry))
+  
+}
+# get coverage
+list_cover <- get_coverage(x = xpoiss, realx = trueval, n = 500, B = B)
+knitr::kable(list_cover$df_coverage)
+
+
+```
+
+
+b) Realiza una gráfica de páneles, en cada panel mostrarás los resultados de 
+uno de los métodos (normal, percentiles), el eje x corresponderá al 
+número de intervalo de confianza ($1,...,500$) y en ele eje vertical grafica el intervalo, usando color para indicar si cubrió al verdadero valor $exp(-2\lambda)$.
+
+```{r}
+# plot coverage
+list_cover$df_boot |> 
+  pivot_wider(names_from = part_ci, values_from = ci) |> 
+  ggplot(aes(num_sample, ymin = lower, ymax = upper, color = failure)) +
+  geom_linerange(size = 0.1) +
+  geom_hline(yintercept = trueval, linetype = 1) +
+  annotate("text", x =  50, y = trueval + 0.001, label = str_glue("True Proba: {round(trueval, 4)}")) +
+  facet_grid(type_ci ~ .) +
+  scale_color_manual(values = c("no" = "gray60", "yes" = "darkred"))
+
+```
+
+c) Repite considerando que se selecciona una muestra de tamaño n = 100. (duda: sobre de quién?)
+
+```{r rep-boot-b100}
+# get coverage
+list_cover <- get_coverage(x = xpoiss, realx = trueval, n = 500, B = 100)
+knitr::kable(list_cover$df_coverage)
+
+```
+
+
+d) Grafica la distribución muestral para una simulación de cada caso de tamaño de muestra, es decir, dos gráficas únicamente.
+
+
+```{r rep-boot-graph-b100}
+list_cover$df_boot |> 
+  pivot_wider(names_from = part_ci, values_from = ci) |> 
+  ggplot(aes(num_sample, ymin = lower, ymax = upper, color = failure)) +
+  geom_linerange(size = 0.1) +
+  geom_hline(yintercept = trueval, linetype = 1) +
+  annotate("text", x =  50, y = trueval + 0.001, label = str_glue("True Proba: {round(trueval, 4)}")) +
+  facet_grid(type_ci ~ .) +
+  scale_color_manual(values = c("no" = "gray60", "yes" = "darkred"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

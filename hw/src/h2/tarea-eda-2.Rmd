@@ -1,0 +1,261 @@
+---
+title: "Tarea - 2"
+output: html_document
+author: "Román Alberto Vélez Jiménez"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+```
+
+
+```{r libraries}
+library(tidyverse)
+```
+
+
+# Series de tiempo
+
+Consideramos la ventas semanales de un producto a lo largo de 5 años, 
+transformaremos la variable de ventas utilizando el logaritmo. 
+
+1. Describe que observas en la gráfica.
+
+```{r, fig.width=5.5, fig.height = 3}
+ventas <- read_csv("../data/ventas_semanal.csv")
+head(ventas)
+
+ggplot(ventas, aes(x = period, y = log(sales.kg))) + 
+  geom_line(size = 0.3) +
+  theme_bw()
+```
+## Observations
+
+1. It looks there is a multiplicative effect
+2. There is an upper tendency 
+3. Stationality quiet clear
+4. The time series maybe has cycles every 50 periods
+
+# Q2: Utiliza un suavizador *loess* para capturar la tendencia de la serie.
+
+```{r loess-trend}
+# get 4 types ofadjustmen
+ventas <- ventas |> 
+  mutate(
+    trend_1_smoother_linear = fitted(loess(log(sales.kg) ~ period, ventas, span = 1, degree = 1)),
+    trend_1_quad = fitted(loess(log(sales.kg) ~ period, ventas, span = 3, degree = 2)),
+    trend_1_smoother_quad = fitted(loess(log(sales.kg) ~ period, ventas, span = 2, degree = 2)),
+  )
+
+# plot adjustment
+ventas |> 
+  pivot_longer(
+    cols = starts_with("trend_1"),
+    names_to = "smoother",
+    values_to = "res1"
+  ) |> 
+  mutate(
+    smoother = str_remove(smoother, "trend_1_")
+  ) |> 
+  ggplot(aes(period, res1, color = smoother)) +
+  geom_line() +
+  geom_line(
+    data = ventas,
+    aes(period, log(sales.kg)),
+    color = "gray",
+    alpha = 0.5
+  ) +
+  xlab("periodo") + ylab("log-ventas") +
+  ggtitle("Distintos suavizamientos para la tendencia") +
+  theme_bw()
+  
+
+# plot
+ggplot(ventas, aes(period, log(sales.kg))) +
+  geom_line(alpha = 0.2) +
+  geom_line(aes(y = trend_1_smoother_quad), colour = "red", size = 1.2) + xlab("") +
+  ggtitle("Suavizamiento apropiado") +
+  theme_bw()
+
+```
+
+# Q3: Residuals
+3. Ahora calcula los residuales de este ajuste y descríbelos
+mediante un suavizamiento más fino. Verifica que se ha estimado la mayor
+parte de la tendencia, e intenta capturar la variación estacional de los 
+residuales.
+
+```{r trend1-residuals-eda}
+# get residuals
+ventas <- ventas |> 
+  mutate(
+    res1 = log(sales.kg) - trend_1_smoother_quad
+  )
+
+# look for residuals
+ventas |> 
+  ggplot(aes(period, res1)) +
+  geom_line(aes(y = res1), alpha = 0.3) +
+  geom_smooth(color = 'darkred', method = loess, method.args = list(degree = 2, span = 3), se = FALSE) +
+  geom_smooth(color = 'darkblue', method = loess, method.args = list(degree = 1, span = 1), se = FALSE) +
+  geom_smooth(color = 'darkgreen', method = loess, method.args = list(degree = 2, span = 1), se = FALSE) +
+  geom_smooth(color = 'pink', method = loess, method.args = list(degree = 2, span = 0.5), se = FALSE) +
+  geom_smooth(color = 'darkorange', method = loess, method.args = list(degree = 2, span = 0.1), se = FALSE) +
+  geom_smooth(color = 'purple', method = loess, method.args = list(degree = 2, span = 0.25), se = FALSE) +
+  ggtitle("Possible smoothers for cyclic trend") +
+  theme_bw()
+
+```
+
+Doing a lot of possible smoothers, it looks that a loess with $\lambda = 0.1$ and $\partial(p) = 2$ captures best the cyclic tendency.
+
+# Q4: Residuals and frequency
+
+4. Grafica los residuales obtenidos después de ajustar el componente 
+estacional para estudiar la componente de mayor frecuencia.
+
+```{r res2-cyclic-trend}
+# plt
+ventas <- ventas |> 
+  mutate(
+    trend2 = fitted(loess(res1 ~ period, span = 0.1, degree = 2)),
+    res2 = res1 - trend2
+  )
+
+ggplot(ventas, aes(period, res2)) +
+  geom_smooth(alpha = 0.5) +
+  geom_line(alpha = 0.8) +
+  ggtitle("Suavizamiento para el ciclo") +
+  theme_bw()
+
+# describe errors (look if they look sort of "normal")
+ventas |> 
+  ggplot(aes(res2)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "steelblue", color = "gray30", alpha = 0.5) +
+  geom_density() +
+  ggtitle("Distribución de los residuos") +
+  theme_bw()
+
+```
+
+It looks that we have already took all the cyclical part.
+
+```{r components}
+# generate days of the week
+DAY_MAP <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+ventas <- ventas |> 
+  mutate(
+    # generate fictional data
+    weekday = DAY_MAP[((period-1) %% 7) + 1],
+    weekday = factor(weekday, levels = DAY_MAP)
+  ) |> 
+  group_by(weekday) |> 
+  mutate(num_day_in_period = row_number()) |> 
+  ungroup()
+
+# get component info (separated)
+ventas |> 
+  ggplot(aes(num_day_in_period, res2)) +
+  geom_line(alpha = 0.4) +
+  geom_smooth(aes(color = weekday), method = "lm", formula = "y ~ 1", se = FALSE) +
+  facet_grid(~ weekday) +
+  ggtitle("Análisis de Componentes", "Por dia") +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(
+    legend.position = "None"
+  )
+
+# get component info (separated & polar)
+ventas |> 
+  ggplot(aes(num_day_in_period, res2)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(aes(color = weekday), se = FALSE, size = 0.5) +
+  coord_polar() +
+  scale_color_viridis_d() +
+  ggtitle("Análisis de Componentes", "Cíclico") +
+  theme_bw()
+
+
+# get component info (join)
+ventas |> 
+  ggplot(aes(period, res2)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(aes(color = weekday), se = FALSE, size = 0.5) +
+  ggtitle("Análisis de Componentes", "Conjunto") +
+  scale_color_viridis_d() +
+  theme_bw()
+
+
+
+```
+
+Given the graphs, it does not looks that the day of the week creates a difference, nor there is a more important component than other. But for the exercise we will still adjust it.
+
+# Q5: Optional. 
+5. (opcional) Visualiza el ajuste, genera una gráfica de páneles, en cada uno muestra
+una componente de la serie de tiempo y los residuales.
+
+```{r get-trend-components}
+# get components loess
+df_components <- ventas |> 
+  group_by(weekday) |> 
+  nest() |> 
+  mutate(
+    trend3 = map(data, ~ loess(res2 ~ period, data = .x, span = 0.75, degree = 1)),
+    trend3 = map(trend3, fitted)
+  ) |> 
+  unnest(cols = c(data, trend3)) |> 
+  mutate(res3 = res2 - trend3) |> 
+  ungroup()
+
+# plot resiudals
+ggplot(df_components, aes(period, res3)) +
+  geom_smooth(alpha = 0.5) +
+  geom_line(alpha = 0.8) +
+  ggtitle("Suavizamiento para los componentes") +
+  theme_bw()
+  
+
+```
+
+```{r df-panels}
+df_panels <- df_components |> 
+  mutate(
+    trend1_centered = trend_1_smoother_quad - mean(trend_1_smoother_quad)
+  ) |> 
+  rename(
+    trend1 = trend1_centered
+  ) |> 
+  select(
+    period, weekday, sales.kg, trend1, trend2, trend3, res3
+  ) |> 
+  pivot_longer(
+    cols = c(starts_with("trend"), res3),
+    names_to = "component",
+    values_to = "value"
+  ) |> 
+  mutate(
+    component = recode(component,
+                       trend1 = "trend",
+                       trend2 = "stationality",
+                       trend3 = "weekdays",
+                       res3 = "residuals"
+                       ),
+    component = factor(component, 
+                       levels = c("trend", "stationality", "weekdays", "residuals")
+                       )
+  ) 
+df_panels
+```
+
+```{r plot-components}
+df_panels |> 
+  ggplot(aes(period, value, color = weekday)) +
+  geom_point(size = 0.5) +
+  facet_wrap(~ component) +
+  scale_color_viridis_d() +
+  ggtitle("Component graphs") +
+  theme_bw()
+
+```

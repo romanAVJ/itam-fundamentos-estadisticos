@@ -1,0 +1,361 @@
+---
+title: "Homework 4"
+author: "Román Vélez Jiménez"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Homework Permutation tests
+
+# --------
+
+# 4.1: Tips
+
+```{r libraries}
+library(tidyverse)
+library(nullabor)
+
+```
+
+## 4.1.1: Tips data
+Q: Does the tips are different between meal and dinner? 
+
+```{r 4.1.1-read-data}
+df_tips <- read_csv("../../data/propinas.csv")
+df_tips |> head()
+
+df_tips |> 
+  ggplot(aes(momento, propina)) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+
+```{r 4.1.1-susp_test}
+set.seed(8)
+df_perm <- lineup(
+  method = null_permute("momento"),
+  true = df_tips, 
+  n = 12
+)
+
+df_perm |> 
+  ggplot(aes(momento, propina)) +
+  geom_boxplot() +
+  coord_flip() +
+  facet_wrap(~ .sample)
+
+```
+
+My shoot is num 1.
+
+```{r 4.1.1-decrypt}
+decrypt("sD0f gCdC En JP2EdEPn Zj")
+
+```
+
+Noup, I couldn't guess it. I think this visual test does not give evidence that both distributions aren't the same, but I think it also does not gives too much evidence that distributions are the same.
+
+# ------
+
+## 4.1.2: Linear Relationship Bill vs Tip
+
+Does there exist some linear relationship between bill & tip?
+
+```{r 4.1.2-perm_bill_tip}
+# permute
+set.seed(8)
+df_perm <- lineup(
+  method = null_permute("propina"),
+  true = df_tips,
+  n = 12
+)
+
+# plot original
+df_tips |> 
+  ggplot(aes(cuenta_total, propina)) +
+  geom_point()
+
+
+# plot samples
+df_perm |> 
+  ggplot(aes(cuenta_total, propina)) +
+  geom_point() +
+  facet_wrap(~ .sample)
+  
+```
+
+My shoot is num 6
+
+```{r 4.1.2-decrypt}
+decrypt("sD0f gCdC En JP2EdEPn Zj")
+
+```
+
+Nailed it. This gives sufficient evidence that there is a linear relationship between bills & tips. I have `r 1.0/12` of significance.
+
+
+# ------
+# 4.1.3: Mean Difference Tips
+
+```{r 4.1.3-permute}
+# perumute
+set.seed(8)
+df_perm <- lineup(
+  method = null_permute("momento"),
+  true = df_tips,
+  n = 5000
+)
+
+# summary
+df_summ_mean <- df_perm |> 
+  group_by(momento, .sample) |> 
+  summarise(mean_tip = mean(propina)) |> 
+  pivot_wider(names_from = momento, values_from = mean_tip) |> 
+  mutate(diff_mean = Cena - Comida)
+
+# print
+df_summ_mean |> head()
+```
+
+```{r 4.1.3viz-test}
+# true mean
+mean_tips <- df_tips |> 
+  group_by(momento) |> 
+  summarise(mean_tip = mean(propina)) |> 
+  pivot_wider(names_from = momento, values_from = mean_tip) |> 
+  mutate(diff_mean = Cena - Comida) |> 
+  pull(diff_mean)
+
+# pvalue
+dist_ref <- ecdf(df_summ_mean$diff_mean)
+stat_diff <- dist_ref(mean_tips)
+pval <- 2 * min(stat_diff, (1 - stat_diff))
+
+# histogram
+df_summ_mean |> 
+  ggplot(aes(diff_mean)) +
+  geom_histogram(color = "black", fill = "gray80") +
+  geom_rect(aes(xmin = mean_tips, xmax = Inf, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+  geom_vline(xintercept = mean_tips, color = "darkred") +
+  annotate("text", x = 0.5, y = 400, label = str_glue("pval: {pval}"), color = "darkred") 
+
+
+```
+
+I think there is evidence to think that there is a difference between meal and dinner tips, without controlling other variables such as size of the bill, the number of people and the day of the week. But also, if there are simulations without the control variables, this effects should cancel out in the simulation
+
+# --------
+
+# 4.2: Phillies data
+
+## 4.2.1: Phillies
+
+Read data
+```{r 4.2.1-read-data}
+df_phil <- read_csv("../../data/Phillies2009.csv")
+df_phil |> head()
+
+```
+
+### 4.2.1.a: lineups
+
+```{r 4.2.1-lineups}
+# create permutations
+set.seed(8)
+df_perm <- lineup(
+  method = null_permute("Location"),
+  true = df_phil,
+  n = 12
+)
+# real data:
+df_phil |> 
+  ggplot(aes(Location, StrikeOuts)) +
+  geom_boxplot() +
+  coord_flip()
+
+# perms
+df_perm |> 
+  ggplot(aes(Location, StrikeOuts)) +
+  geom_boxplot() +
+  coord_flip() +
+  facet_wrap(~ .sample)
+```
+
+My guess is *num 11*. 
+
+```{r 4.2.1-decode}
+decrypt("sD0f gCdC En JP2EdEPn 8Z")
+
+```
+
+Got it. I have, somewhat, evidence that the distribution between them isn't the same.
+
+```{r 4.2.1-mean}
+# mean per game
+df_phil |> 
+  group_by(Location) |> 
+  summarize(mean_strikes_out = mean(StrikeOuts))
+
+# get mean
+mean_strikes <- df_phil |> 
+  group_by(Location) |> 
+  summarize(mean_strikes_out = mean(StrikeOuts)) |> 
+  pivot_wider(names_from = Location, values_from = mean_strikes_out) |> 
+  mutate(diff = Home - Away) |> 
+  pull(diff)
+
+```
+
+```{r 4.2.1-perm-diff}
+set.seed(8)
+df_perm <- lineup(
+  method = null_permute("Location"),
+  true = df_phil,
+  n = 5000
+)
+
+# summary
+df_summ_mean <- df_perm |> 
+  group_by(Location, .sample) |> 
+  summarize(mean_strikes_out = mean(StrikeOuts)) |> 
+  pivot_wider(names_from = Location, values_from = mean_strikes_out) |> 
+  mutate(diff = Home - Away)
+
+# pvalue
+dist_ref <- ecdf(df_summ_mean$diff)
+stat_diff <- dist_ref(mean_strikes)
+pval <- 2 * min(stat_diff, (1 - stat_diff))
+
+# histogram
+df_summ_mean |> 
+  ggplot(aes(diff)) +
+  geom_histogram(color = "black", fill = "gray80") +
+  geom_rect(aes(xmax = mean_strikes, xmin = -Inf, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+  geom_vline(xintercept = mean_strikes, color = "darkred") +
+  annotate("text", x = 0.5, y = 400, label = str_glue("pval: {pval}"), color = "darkred")
+```
+
+# 4.2.2: paired tests
+
+- En este ejemplo buscamos comparar la diferencia entre dos medicinas para dormir.
+- ID es el identificador de paciente, group el identificador de la medicina, y extra son las horas extras de sueño.
+
+```{r 4.2.2-read-data}
+df_sleep <- sleep |> as_tibble()
+df_sleep
+```
+
+La pregunta de interés es si una medicina es mejor que otra para prolongar el sueño. Nótese que en este caso, no tenemos grupos, sino mediciones repetidas.
+
+1. Null hypothesis $\mathcal{H}_{0}$: there do not exist difference of sleep between medicines.
+2. Stat of interest: $D = \bar{X} - \bar{Y}$. Where $X$ is medicine 1 and $Y$ is medicine 2.
+
+```{r 4.2.2-mean-diff}
+mean_diff <-  df_sleep |> 
+  group_by(group) |> 
+  summarize(mean_sleep = mean(extra)) |> 
+  mutate(group = str_glue("group_{group}")) |> 
+  pivot_wider(names_from = group, values_from = mean_sleep) |> 
+  mutate(diff = group_2 - group_1) |> 
+  pull(diff)
+
+```
+
+3. Are the amount of time of sleep the same between them?
+
+```{r 4.2.3-look-difference}
+# difference in time between groups
+df_sleep |> 
+  ggplot(aes(extra, color = group)) +
+  stat_ecdf()
+
+```
+
+```{r 4.2.3-calculate difference}
+set.seed(8)
+df_perm <- lineup(
+  method = null_permute("extra"),
+  true = df_sleep,
+  n = 5000
+)
+
+# summary
+df_summ_mean <- df_perm |> 
+  group_by(group, .sample) |> 
+  summarize(mean_sleep = mean(extra)) |> 
+  mutate(group = str_glue("group_{group}")) |> 
+  pivot_wider(names_from = group, values_from = mean_sleep) |> 
+  mutate(diff = group_2 - group_1)
+
+# pvalue
+dist_ref <- ecdf(df_summ_mean$diff)
+stat_diff <- dist_ref(mean_diff)
+pval <- 2 * min(stat_diff, (1 - stat_diff))
+
+# histogram
+df_summ_mean |> 
+  ggplot(aes(diff)) +
+  geom_histogram(color = "black", fill = "gray80") +
+  geom_rect(aes(xmin = mean_diff, xmax = Inf, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+  geom_vline(xintercept = mean_diff, color = "darkred") +
+  annotate("text", x = -2.5, y = 400, label = str_glue("pval: {pval}"), color = "darkred")
+```
+
+```{r tere-solution}
+# the idea es to control by persona!!!
+diffs_perms <- sleep %>% 
+  group_split(ID) %>% 
+  map_df(., ~lineup(null_permute("group"), ., pos = 1, n = 1000))
+
+diffs <- diffs_perms %>% 
+  group_by(.sample, group) %>% 
+  summarise(mean_extra = mean(extra), .groups = "drop_last") %>% 
+  summarise(diff_means = diff(mean_extra))
+
+# it changes alot!
+```
+
+
+
+
+
+
+
+
+### 4.2.4 P-value
+
+For the stat $\hat{P} = (X+1)/(N+1)$ what is the respective variance? 
+
+Getting the variance should be (WIP)
+$$
+\text{Var}(P) = Var((X+1)/(N+1)) = Var(X/(N+1)) = N/(N+1)^2\sigma^2
+$$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

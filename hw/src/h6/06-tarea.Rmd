@@ -1,0 +1,345 @@
+---
+title: "Tarea 06"
+author: "Román Vélez Jiménez"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, error = TRUE, include = TRUE)
+```
+
+# 1) Proportions
+
+*Context:*
+
+1. **Proporciones.** Usaremos datos de reincidencia en conducta criminal del
+estado de Iowa, este estado sigue a los delincuentes por un periodo de 3 años y
+registra el número de días hasta reincidencia para aquellos que son readmitidos 
+en prisión. El departamento de correcciones utiliza los datos de
+reincidencia para evaluar sus programas de prevención de recaída en 
+conducta criminal.
+
+Los datos Recidivism contienen información de todos los delincuentes 
+condenados por dos tipos de delito durante 2010 (*Recid* indica
+si recayeron en conducta criminal).
+
+* De éstos $31.6\%$ reincidieron y volvieron a prisión. Utiliza simulación
+para aproximar la simulación muestral de $\hat{p}$, la proporción 
+de delincuentes que reincidieron para muestras de tamaño 25.
+
+* Calcula el error estándar de $\hat{p}$, y compáralo con el teórico
+$\sqrt{p(1-p)/n}$.
+
+* Repite para muestras de tamaño 250 y compara.
+
+## Read data
+
+```{r 1-recid-data}
+library(tidyverse)
+df_recidivism <- read_csv("../../data/Recidivism.csv")
+
+print(head(df_recidivism))
+print(glimpse(df_recidivism))
+```
+### Population mean & std
+
+```{r 1-recid-percentage}
+# get exact proportion
+prop_recid <- mean(df_recidivism$Recid == 'Yes', na.rm = TRUE)
+print(str_glue("proportion of resid: {round(prop_recid * 100, 2)}%"))
+
+std_prop <- sqrt(prop_recid * (1 - prop_recid) * (nrow(df_recidivism))^(-1))
+print(str_glue("std of prop of resid: {round(std_prop * 100, 8)}%"))
+```
+
+### Boostrap
+
+```{r 1-bootstrap}
+# function
+f_bootstrap_proportion <- function(df, M, B){
+  # B: number of simulations
+  # M: size of the sample
+  #g: statistical function
+  
+  # generate B samples of indexes
+  b_samples <- lapply(1:B, function(x) sample(df$Recid, size = M, replace = TRUE))
+  
+  # subset apply
+  gsubset_apply <- function(x){
+    return(mean(x == 'Yes'))
+  }
+  
+  # # get B samples of the stat
+  stats <- sapply(b_samples, gsubset_apply)
+  return(stats)
+}
+
+# generate bootstrap
+M <- 25
+B <- 500
+bootstrap_proportion <- f_bootstrap_proportion(
+  df_recidivism,
+  M = M,
+  B = B
+)
+
+# plot histogram
+df_plot <- tibble(
+    simulations = 1:B,
+    stats = bootstrap_proportion
+  ) 
+std_bootstrap <- sd(bootstrap_proportion)
+
+df_plot |> 
+  ggplot(aes(stats)) + 
+  geom_density(size = 1) +
+  geom_histogram(aes(y = ..density..), fill = "steelblue", alpha = 0.5, color = 'black') +
+  geom_vline(xintercept = mean(df_plot$stats), color = 'orange', size = 1) +
+  geom_vline(xintercept = prop_recid, color = 'darkgreen', size = 1, linetype = 2) +
+  ggtitle("Resample of proportion", str_glue("Tamaño de muestra {M}")) +
+  annotate("text", x=-Inf, y=-Inf, hjust=0, vjust=0, label=str_glue("std: {round(std_bootstrap * 100, 4)}%")) +
+  xlab("Proportion") + ylab("Density") +
+  scale_x_continuous(labels = scales::percent) +
+  theme_bw()
+  
+
+# generate bootstrap
+M <- 250
+B <- 500
+bootstrap_proportion <- f_bootstrap_proportion(
+  df_recidivism,
+  M = M,
+  B = B
+)
+
+# plot histogram
+df_plot <- tibble(
+    simulations = 1:B,
+    stats = bootstrap_proportion
+  ) 
+std_bootstrap <- sd(bootstrap_proportion)
+
+df_plot |> 
+  ggplot(aes(stats)) + 
+  geom_density(size = 1) +
+  geom_histogram(aes(y = ..density..), fill = "steelblue", alpha = 0.5, color = 'black') +
+  geom_vline(xintercept = mean(df_plot$stats), color = 'orange', size = 1) +
+  geom_vline(xintercept = prop_recid, color = 'darkgreen', size = 1, linetype = 2) +
+  ggtitle("Resample of proportion", str_glue("Tamaño de muestra {M}")) +
+  annotate("text", x=-Inf, y=-Inf, hjust=0, vjust=0, label=str_glue("std: {round(std_bootstrap * 100, 4)}%")) +
+  xlab("Proportion") + ylab("Density") +
+  scale_x_continuous(labels = scales::percent) +
+  theme_bw()
+  
+  
+
+
+```
+
+*ANSWER:* 
+We notice a bigger variance for the bootstrapped statistics, specially for small M. The theoretical std is too small by the fact of the number of observations. 
+
+
+# 2) Mixture of Distributions
+
+2. **Mezcla de distribuciones**. Imaginemos que nuestro modelo teórico es una mezcla de dos poblaciones, una gamma y una normal
+
+```{r 2-mixture-1}
+muestrear_pob <- function(n){
+  u <- runif(n) # número aleatorio
+  map_dbl(u, ~ ifelse(.x < 1/2, rgamma(1, 5, 0.1), rnorm(1, 100, 5)))
+}
+```
+
+El modelo teórico se puede graficar, pero también podemos obetener una aproximación buena haciendo una cantidad grande de simulaciones
+
+```{r 2-mixture-2}
+muestra_aprox <- muestrear_pob(10000)
+qplot(muestra_aprox, binwidth= 2)
+```
+Ahora consideramos estimar la media de esta distribución con un muestra de tamaño 50. ¿Cómo se ve la distribución de muestreo de la media? Grafica un histograma y una gráfica cuantil-cuantil normal.
+
+## Trial 1: Naive one
+
+Get bootsraped mean without control
+
+```{r 2-mixture-mean}
+M <- 50
+medias <- map_dbl(1:2000,  ~ mean(sample(muestra_aprox, size=M, replace=TRUE)))
+
+# plot
+qplot(medias, bins=20) +
+  geom_vline(xintercept = mean(medias), size = 1, color = "darkred") +
+  xlab("Mean") + ylab("Density") +
+  ggtitle("Distribution of the mean") +
+  theme_bw()
+```
+
+
+# 3) SE($\bar{x}$)
+
+3. **El error estándar de una media.** Supongamos que $x$ es una variable
+aleatoria que toma valores en los reales con distribución de probabilidad $F$.
+Denotamos por $\mu$ y $\sigma^2$ la media y varianza de $F$,
+
+$$\mu = E(x),$$ 
+
+$$\sigma^2=var(x)=E[(x-\mu)^2]$$
+
+
+Ahora, sea $(X_1,...,X_n)$ una muestra aleatoria de $F$, de tamaño $n$, 
+la media de la muestra $\bar{X}=\sum_{i=1}^nX_i/n$ tiene:
+
+* esperanza $\mu$,
+
+* varianza $\sigma^2/n$.
+
+En palabras: la esperanza de $\bar{X}$ es la misma que la esperanza de $x$, pero
+la varianza de $\bar{X}$ es $1/n$ veces la varianza de $x$, así que entre
+mayor es la $n$ tenemos una mejor estimación de $\mu$.
+
+En el caso del estimador de la media $\bar{X}$, el error estándar quedaría
+
+$$ee(\bar{X}) = [var(\bar{X})]^{1/2}= \sigma/ \sqrt{n}.$$
+Entonces, 
+
+* Consideramos los datos de ENLACE edo. de México (ENLACE era una prueba estandarizada que se aplicaba a todos los alumnos de primaria en México), y la columna de calificaciones de español 3^o^ de primaria (`esp_3`). 
+
+```{r 3-boot}
+df_enlace <- read_csv("../../data/enlace_15.csv")
+df_enlace
+```
+
+- Genera un histograma de las calificaciones de 3^o^ de primaria. Calcula la 
+media y la desviación estándar.
+
+```{r 3-boot-hist}
+plt_hist_grades <- function(df, M=-1){
+  # size of the sample
+  msize <- ifelse(M > 0, M, nrow(df))
+  
+  # subset df
+  df <- df |> slice_sample(n = msize, replace = FALSE)
+  
+  # get mean and std
+  mu <- mean(df$esp_3, na.rm = TRUE)
+  sigma <- sd(df$esp_3, na.rm = TRUE)
+  
+  # plot
+  print(
+    df |> 
+      ggplot(aes(esp_3)) +
+      geom_rect(aes(xmin = mu - sigma, xmax = mu + sigma, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+      geom_vline(xintercept = mean(mu), size = 1, color = "darkred") +
+      geom_histogram(alpha = 0.8, bins = 30) +
+      ggtitle("Grades", str_glue("Sample size: {msize}")) +
+      annotate("text", x=-Inf, y=-Inf, hjust=0, vjust=0, label=str_glue("mean: {round(mu, 2)} \nstd: {round(sigma, 2)}")) +
+      xlab("Grade") + ylab("Density") + 
+      scale_x_continuous(limits = c(300, 900)) +
+      theme_bw()
+  )
+}
+
+plt_hist_grades(df_enlace)
+
+```
+
+We have the population mean & std which is 
+
+- $\mu = 552.99$
+- $\sigma = 59.26$
+
+## Histogram for different sample sizes 
+
+- Para tamaños de muestra $n = 10, 100, 1000$:
+
+```{r 3-boot-various-samples}
+for(num in c(10, 100, 1000))
+  plt_hist_grades(df_enlace, num)
+```
+
+## bootstrap for different sample sizes
+
+- Aproximareos la distribución muestral: 
+i) simula 5,000 muestras aleatorias (con reemplazo), ii) calcula la media en cada muestra, iii) Realiza un histograma de la distribución muestral de las medias (las medias del
+paso anterior) iv) aproxima el error estándar calculando la desviación estándar
+de las medias del paso ii.
+
+
+- Calcula el error estándar de la media para cada tamaño de muestra usando la
+fórmula derivada arriba y compara con tus simulaciones.* **(doubt)**
+
+```{r 3-boot-mean}
+f_bootstrap_mean <- function(df, M, B){
+  # B: number of simulations
+  # M: size of the sample
+  #g: statistical function
+  
+  # generate B samples of indexes
+  b_samples <- lapply(1:B, function(x) sample(df$esp_3, size = M, replace = TRUE))
+  
+  # subset apply
+  gsubset_apply <- function(x){
+    return(mean(x))
+  }
+  
+  # # get B samples of the stat
+  stats <- sapply(b_samples, gsubset_apply)
+  return(stats)
+}
+
+# simulation of the distribution
+for(num in c(10, 100, 1000)){
+  set.seed(8)
+  boot_mean_grades <- f_bootstrap_mean(df_enlace, M=num, B=5000)
+  
+  # mean and std
+  mean_grades <- mean(boot_mean_grades)
+  sd_grades <- sd(boot_mean_grades)
+  
+  # plot
+  print(qplot(boot_mean_grades, bins = 50) +
+    geom_rect(aes(xmin = mean_grades - sd_grades, xmax = mean_grades + sd_grades, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+    geom_vline(xintercept = mean_grades, size = 1, color = "darkred") +
+    ggtitle("Distribution of the mean") +
+    annotate("text", x=-Inf, y=-Inf, hjust=0, vjust=0, label=str_glue("mean: {round(mean_grades)} \nstd: {round(sd_grades, 2)}")) +
+    xlab("Grade") + ylab("Density") + 
+    scale_x_continuous(limits = c(480, 640)) +
+    theme_bw())
+  
+  # std
+  cat("\n")
+  cat(str_glue("\n bootstrapped sd {round(sd_grades, 4)}"))
+}
+
+population_sd <- sqrt(sum((mean(df_enlace$esp_3) - df_enlace$esp_3)^2) / nrow(df_enlace))
+cat("\n")
+cat(str_glue("population sd {round(population_sd, 4)}"))
+```
+
+- ¿Cómo se comparan los errores estándar correspondientes a los distintos 
+tamaños de muestra? 
+
+
+
+
+**ANSWER**
+It looks that for each $k$ in the 10^{k} increase of the sample reduces in $1/\sqrt n$ the mean std, as stated in $ee(\bar{X}) = [var(\bar{X})]^{1/2}= \sigma/ \sqrt{n}$. 
+
+```{r 3-boot-std-decrease}
+std_pop <- 59.26
+cat(str_glue("population std: {std_pop}"))
+cat("\n")
+cat(str_glue("theoretical decrease to 10: {std_pop/sqrt(10)}\n"))
+cat("\n")
+cat(str_glue("theoretical decrease to 100: {std_pop/sqrt(100)}\n"))
+cat("\n")
+cat(str_glue("theoretical decrease to 1000: {std_pop/sqrt(1000)}\n"))
+cat("\n")
+
+
+
+```
+
+For example, this implies that for a sample of ~1000 the $ee(\bar{X})$ will be approximately $\sigma/\sqrt{n} \approx 1.87$. So with simulations we can approach what should be the size of a sample in order to have a "sound" $ee(\bar{X})$.
+
