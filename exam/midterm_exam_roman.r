@@ -414,10 +414,10 @@ df_bootstrap_combined_ratio_calibration |>
 
 #### exploratory analysis for null votes ####
 # from the df_muestra, do an eda for null votes
-df_computos |> glimpse()
+df_muestra |> glimpse()
 
 #### explore by percentage by poll booth 
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -433,7 +433,7 @@ df_computos |>
 
 
 # is ok
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -447,7 +447,7 @@ df_computos |>
     labs(x = "Porcentaje de votos nulos", y = "") 
 
 # i liked more this viz
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -461,7 +461,7 @@ df_computos |>
     labs(x = "Porcentaje de votos nulos", y = "") 
 
 #### explore by strata
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -476,7 +476,7 @@ df_computos |>
     labs(x = "Porcentaje de votos nulos", y = "Densidad")
 
 # is ok
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -490,7 +490,7 @@ df_computos |>
     labs(x = "Porcentaje de votos nulos", y = "")
 
 # i liked more this viz
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -504,8 +504,8 @@ df_computos |>
     labs(x = "Porcentaje de votos nulos", y = "")
 
 #### explore by type of polling booth
-table_null_by_type_poll_booth  <- df_computos |> 
-    group_by(TIPO_MRCP) |> 
+table_null_by_type_poll_booth  <- df_muestra |> 
+    group_by(TIPO_CASILLA) |> 
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
     )
@@ -516,7 +516,7 @@ knitr::kable(
     )
 
 #### by state
-df_computos |> 
+df_muestra |> 
     group_by(ENTIDAD) |> 
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -533,7 +533,7 @@ df_computos |>
     coord_flip()
 
 #### relationship between null votes and total votes (scatter + loess)
-df_computos |> 
+df_muestra |> 
     group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL),
@@ -541,7 +541,7 @@ df_computos |>
     ) |> 
     ungroup() |> 
     ggplot(aes(x = TOTAL, y = PERCENT_NULL)) +
-    geom_point(color = "steelblue", alpha = 0.5) +
+    geom_point(color = "#46b478", alpha = 0.5) +
     geom_smooth(method = "loess", color = "darkred", se = FALSE) +
     scale_x_continuous(labels = scales::comma, trans = "log2") +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1), trans = "sqrt") +
