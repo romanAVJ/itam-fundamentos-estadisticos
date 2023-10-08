@@ -7,6 +7,7 @@
 library(tidyverse)
 library(nullabor)
 
+
 SEED  <- 8
 #### hypothesis test  ####
 # read data 
@@ -154,19 +155,9 @@ df_muestra <- read_delim("https://ine.mx/wp-content/uploads/2021/08/Conteos-Cons
   ungroup()
 
 # get estimate of combined ratio of votes #
-# step 0: get total votes by polling booth
-df_muestra_by_polling_booth  <- df_muestra |> 
-    group_by(ID_CASILLA, ESTRATO) |>
-    summarise(across(c(SI, NO, NULOS, TOTAL), sum), num_obs = n())  |> 
-    arrange(ESTRATO, ID_CASILLA) |> 
-    group_by(ESTRATO) |>
-    mutate(num_polling_booths = n()) |> 
-    ungroup()
-df_muestra_by_polling_booth
-
 # step 1: get Nh / nh
 df_polling_booths_total  <- df_computos |> count(ESTRATO) |> rename(Nh = n)
-df_polling_booths_selected  <- df_muestra_by_polling_booth |> group_by(ESTRATO) |> summarise(nh = sum(num_obs))
+df_polling_booths_selected  <- df_muestra |> count(ESTRATO) |> rename(nh = n)
 df_polling_booths  <- df_polling_booths_total |> 
     inner_join(df_polling_booths_selected, by = "ESTRATO") |> 
     mutate(Nh_nh = Nh / nh) |> 
@@ -174,8 +165,8 @@ df_polling_booths  <- df_polling_booths_total |>
 
 df_polling_booths
 
-# step 2: get total votes expanded, i.e. sum(Nh_nh * sum_{ID_CASILLA}(TOTAL))
-df_total_votes  <- df_muestra_by_polling_booth |> 
+# step 2: get total votes expanded, i.e. sum(Nh_nh * sum_{ID}(TOTAL))
+df_total_votes  <- df_muestra |> 
     inner_join(df_polling_booths, by = "ESTRATO") |> 
     mutate(weighted_total_votes = TOTAL * Nh_nh)
 
@@ -184,7 +175,7 @@ df_total_votes
 total_expanded_votes  <- sum(df_total_votes$weighted_total_votes)
 
 # step 3: get total votes expanded by option
-df_total_votes_by_option  <- df_muestra_by_polling_booth |> 
+df_total_votes_by_option  <- df_muestra |> 
     pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", values_to = "VOTOS") |> 
     inner_join(df_polling_booths, by = "ESTRATO") |>
     mutate(weighted_total_votes = VOTOS * Nh_nh)
@@ -192,7 +183,7 @@ df_total_votes_by_option  <- df_muestra_by_polling_booth |>
 df_total_votes_by_option
 
 # step 4: get estimate of combined ratio of votes
-table_combined_ratios  <- df_total_votes_by_option |> 
+table_combined_ratios  <- df_total_votes_by_option |>
     group_by(OPCION) |> 
     summarise(combined_ratio = sum(weighted_total_votes) / total_expanded_votes)
 # print table in html with percentage format
@@ -203,16 +194,24 @@ knitr::kable(
     )
 
 # create a bootstrap function to get the combined ratio of votes #
-get_combined_ratio  <- function(df, df_polling_booths){
+get_combined_ratio  <- function(df_population, df_sample){
+    # setp 0: get Nh / nh
+    df_polling_booths_total  <- df_population |> count(ESTRATO) |> rename(Nh = n)
+    df_polling_booths_selected  <- df_sample |> count(ESTRATO) |> rename(nh = n)
+    df_polling_booths  <- df_polling_booths_total |> 
+        inner_join(df_polling_booths_selected, by = "ESTRATO") |> 
+        mutate(Nh_nh = Nh / nh) |> 
+        select(ESTRATO, Nh_nh)
+
     # step 1: get total votes expanded
-    total_expanded_votes  <- df |> 
+    total_expanded_votes  <- df_sample |> 
         inner_join(df_polling_booths, by = "ESTRATO") |> 
         mutate(weighted_total_votes = TOTAL * Nh_nh) |> 
         pull(weighted_total_votes) |>
         sum()
 
     # step 2: get combined ratios expanded by option
-    df_total_votes_by_option  <- df |> 
+    df_total_votes_by_option  <- df_sample |> 
         pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", values_to = "VOTOS") |> 
         inner_join(df_polling_booths, by = "ESTRATO") |>
         mutate(weighted_total_votes = VOTOS * Nh_nh) |> 
@@ -222,29 +221,29 @@ get_combined_ratio  <- function(df, df_polling_booths){
     return(df_total_votes_by_option)
 }
 # look if function works
-df_total_votes_by_optionv2  <- get_combined_ratio(df_muestra_by_polling_booth, df_polling_booths) # is ok!
-
+df_total_votes_by_optionv2  <- get_combined_ratio(df_computos, df_muestra) # is ok!
+df_total_votes_by_optionv2
 # create bootstrap function
-svy_boot  <- function(df_sample, df_polling){
+svy_boot  <- function(df_population, df_sample){
     # get sample of polling booths BY ESTRATO
     df_sample_by_estrato  <- df_sample |> 
         group_split(ESTRATO) |> 
         map_df(~ slice_sample(
             .x, 
-            n = first(.x$num_polling_booths), 
+            n = max(first(.x$n) - 1, 1), # rao & wu say to sample n - 1
             replace = TRUE)
         )
 
     # get combined ratio of votes
-    df_combined_ratio  <- get_combined_ratio(df_sample_by_estrato, df_polling)
+    df_combined_ratio  <- get_combined_ratio(df_population, df_sample_by_estrato)
     return(df_combined_ratio)
 }
 
 # generate bootstrap samples
 set.seed(SEED)
-N_BOOT  <- 50
-df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_muestra_by_polling_booth, df_polling_booths))
-
+N_BOOT  <- 250
+df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_computos, df_muestra))
+df_bootstrap_combined_ratio
 # get normal confidence interval at 95%
 ALPHA  <- 0.05
 Z_ALPHA  <- qnorm(1 - ALPHA / 2)
@@ -293,24 +292,30 @@ table_se_combined_ratio |>
     theme(legend.position = "none")
 
 #### Calibracion ####
-# from df_muestra_by_polling_booth get 50 samples of size M = length(df_muestra_by_polling_booth)
+# from df_muestra get 50 samples of size M = length(df_muestra)
 # and apply svy_boot to each sample
 set.seed(SEED)
-N_BOOT  <- 27
+N_BOOT  <- 250
 N_CI  <- 50
-M  <- 200
+M  <- 1745 # same as the sample size of df_muestra
 
-applyboot  <- function(df_sample, df_polling, num_boot=1000){
+applyboot  <- function(df_sample, df_population, num_boot=1000){
     # get combined ratio of votes
-    df_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_sample, df_polling))
+    df_combined_ratio  <- map_dfr(1:num_boot, ~ svy_boot(df_population, df_sample))
     return(df_combined_ratio)
 }
 
 df_bootstrap_combined_ratio_calibration  <- map_df(1:N_CI, ~ {
     # apply svy_boot to each sample of size M per polling booth
-    df_sample_by_poll  <- df_muestra_by_polling_booth |> 
+    df_sample_by_poll  <- df_computos |>
+        rename(SI = OPINION_SI, NO = OPINION_NO) |> 
         slice_sample(n = M, replace = TRUE) |>
-        applyboot(df_polling_booths, num_boot=N_BOOT) |> 
+        # get num of polling booths by ESTRATO
+        group_by(ESTRATO) |> 
+        mutate(n = n()) |> 
+        ungroup() |>
+        # apply svy_boot to each polling booth
+        applyboot(df_computos, num_boot=N_BOOT) |> 
         group_by(OPCION) |> 
         summarise(
             mean = mean(combined_ratio), 
@@ -377,15 +382,30 @@ df_bootstrap_combined_ratio_calibration |>
     coord_flip() +
     theme(legend.position = "none")
 
+# do a qq normal plot for each option
+df_bootstrap_combined_ratio_calibration |> 
+    group_split(OPCION) |> 
+    map(~ {
+        .x |> 
+            ggplot(aes(sample = mean)) +
+            geom_qq() + geom_qq_line() +
+            theme_minimal() +
+            ggtitle(str_glue("QQ-plot para {first(.x$OPCION)}")) +
+            labs(x = "Cuantiles teóricos", y = "Cuantiles empíricos") +
+            theme(legend.position = "none")
+    })
+
+
+
 # actually they do not look very baised
 
 #### exploratory analysis for null votes ####
-# from the df_muestra_by_polling_booth, do an eda for null votes
-df_muestra |> glimpse()
+# from the df_muestra, do an eda for null votes
+df_computos |> glimpse()
 
 #### explore by percentage by poll booth 
-df_muestra |> 
-    group_by(ESTRATO, ID_CASILLA) |>
+df_computos |> 
+    group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
     ) |> 
@@ -400,8 +420,8 @@ df_muestra |>
 
 
 # is ok
-df_muestra |> 
-    group_by(ESTRATO, ID_CASILLA) |>
+df_computos |> 
+    group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
     ) |> 
@@ -414,8 +434,8 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "") 
 
 # i liked more this viz
-df_muestra |> 
-    group_by(ESTRATO, ID_CASILLA) |>
+df_computos |> 
+    group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
     ) |> 
@@ -428,11 +448,11 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "") 
 
 #### explore by strata
-df_muestra |> 
+df_computos |> 
     group_by(ESTRATO) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
-    ) |> 
+    ) |>
     ungroup() |>
     ggplot(aes(x = PERCENT_NULL)) +
     geom_histogram(bins = 30, fill = "steelblue", color = "black", alpha = 0.5) +
@@ -443,7 +463,7 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "Densidad")
 
 # is ok
-df_muestra |> 
+df_computos |> 
     group_by(ESTRATO) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -457,7 +477,7 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "")
 
 # i liked more this viz
-df_muestra |> 
+df_computos |> 
     group_by(ESTRATO) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
@@ -471,8 +491,8 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "")
 
 #### explore by type of polling booth
-table_null_by_type_poll_booth  <- df_muestra |> 
-    group_by(TIPO_CASILLA) |> 
+table_null_by_type_poll_booth  <- df_computos |> 
+    group_by(TIPO_MRCP) |> 
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
     )
@@ -483,23 +503,25 @@ knitr::kable(
     )
 
 #### by state
-df_muestra |> 
-    group_by(ID_ESTADO) |> 
+df_computos |> 
+    group_by(ENTIDAD) |> 
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL)
     ) |> 
-    arrange(ID_ESTADO) |>
+    arrange(desc(ENTIDAD)) |>
     # col plot
-    ggplot(aes(ID_ESTADO, PERCENT_NULL)) +
+    ggplot(aes(ENTIDAD, PERCENT_NULL)) +
     geom_col(fill = "steelblue", color = "black", alpha = 0.5) +
-    geom_text(aes(label = scales::percent(PERCENT_NULL, accuracy = 1)), vjust = -0.5) +
+    geom_text(aes(label = scales::percent(PERCENT_NULL)), vjust = -0.5) +
+    scale_y_continuous(labels = scales::percent) +
     theme_minimal() +
     ggtitle("Porcentaje de votos nulos por estado") +
-    labs(x = "Estado", y = "Porcentaje de votos nulos")
+    labs(x = "Estado", y = "Porcentaje de votos nulos") +
+    coord_flip()
 
 #### relationship between null votes and total votes (scatter + loess)
-df_muestra |> 
-    group_by(ESTRATO, ID_CASILLA) |>
+df_computos |> 
+    group_by(ESTRATO, ID) |>
     summarise(
         PERCENT_NULL = sum(NULOS) / sum(TOTAL),
         TOTAL = sum(TOTAL)
