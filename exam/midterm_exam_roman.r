@@ -227,10 +227,12 @@ svy_boot  <- function(df_sample, df_polling){
     # get sample of polling booths BY ESTRATO
     df_sample_by_estrato  <- df_sample |> 
         group_split(ESTRATO) |> 
-        map_df(~ slice_sample(.x, n = num_polling_booths - 1, replace = TRUE))
-        # slice_sample(n = num_polling_booths - 1, replace = TRUE) |> # rao & wu 
-        # ungroup()
-    
+        map_df(~ slice_sample(
+            .x, 
+            n = first(.x$num_polling_booths), 
+            replace = TRUE)
+        )
+
     # get combined ratio of votes
     df_combined_ratio  <- get_combined_ratio(df_sample_by_estrato, df_polling)
     return(df_combined_ratio)
@@ -238,13 +240,162 @@ svy_boot  <- function(df_sample, df_polling){
 
 # generate bootstrap samples
 set.seed(SEED)
-N_BOOT  <- 1000
-df_bootstrap_combined_ratio  <- map_df(1:N_BOOT, ~ svy_boot(df_muestra_by_polling_booth, df_polling_booths) |> 
-    rename(BOOT = .x))
+N_BOOT  <- 50
+df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_muestra_by_polling_booth, df_polling_booths))
 
-df_muestra_by_polling_booth|> 
-        group_by(ESTRATO) |> 
-        mutate(num_polling_booths = n())
+# get normal confidence interval at 95%
+ALPHA  <- 0.05
+Z_ALPHA  <- qnorm(1 - ALPHA / 2)
+
+# get confidence interval
+table_se_combined_ratio  <- df_bootstrap_combined_ratio |> 
+    group_by(OPCION) |> 
+    summarise(
+        mean = mean(combined_ratio), 
+        sd = sd(combined_ratio), 
+        lower = mean - Z_ALPHA * sd, 
+        upper = mean + Z_ALPHA * sd
+    ) |> 
+    mutate(longitud = upper - lower)
+
+table_se_combined_ratio |> 
+    knitr::kable(
+        digits = 4, 
+        format.args = list(big.mark = ",", decimal.mark = ".", format = "f"), 
+        caption = "Intervalos de confianza al 95% para las razones combinadas de votos"
+        )
+
+# get observed ratios
+table_observed_ratios  <- df_computos |> 
+    rename(SI = OPINION_SI, NO = OPINION_NO) |>
+    pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", values_to = "VOTOS") |> 
+    group_by(OPCION) |>
+    summarise(VOTOS = sum(VOTOS)) |> 
+    ungroup() |>
+    mutate(
+        PERCENT_VOTOS = VOTOS / sum(VOTOS),
+    )
+table_observed_ratios
+
+# plot confidence intervals. use error bars with lower and upper. use percent_votos as point estimate
+table_se_combined_ratio |> 
+    inner_join(table_observed_ratios, by = "OPCION") |> 
+    ggplot(aes(x = OPCION, y = PERCENT_VOTOS, ymin = lower, ymax = upper)) +
+    geom_errorbar(width = 0.2) +
+    geom_point(color = "darkred") +
+    theme_minimal() +
+    ggtitle("Intervalos de confianza al 95% para las razones combinadas de votos") +
+    labs(x = "Opción", y = "Porcentaje de votos") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    coord_flip() +
+    theme(legend.position = "none")
+
+#### Calibracion ####
+# from df_muestra_by_polling_booth get 50 samples of size M = length(df_muestra_by_polling_booth)
+# and apply svy_boot to each sample
+set.seed(SEED)
+N_BOOT  <- 27
+N_CI  <- 50
+M  <- 200
+
+applyboot  <- function(df_sample, df_polling, num_boot=1000){
+    # get combined ratio of votes
+    df_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_sample, df_polling))
+    return(df_combined_ratio)
+}
+
+df_bootstrap_combined_ratio_calibration  <- map_df(1:N_CI, ~ {
+    # apply svy_boot to each sample of size M per polling booth
+    df_sample_by_poll  <- df_muestra_by_polling_booth |> 
+        slice_sample(n = M, replace = TRUE) |>
+        applyboot(df_polling_booths, num_boot=N_BOOT) |> 
+        group_by(OPCION) |> 
+        summarise(
+            mean = mean(combined_ratio), 
+            sd = sd(combined_ratio), 
+            lower = mean - Z_ALPHA * sd, 
+            upper = mean + Z_ALPHA * sd
+        )
+    return(df_sample_by_poll)},
+    .id = 'rep'
+)
+
+df_bootstrap_combined_ratio_calibration
+
+# get the number of times the observed ratio is in the confidence interval
+table_calibration  <- df_bootstrap_combined_ratio_calibration |> 
+    inner_join(table_observed_ratios, by = "OPCION") |> 
+    mutate(
+        in_ci = ifelse(lower <= PERCENT_VOTOS & PERCENT_VOTOS <= upper, 1, 0)
+    ) |> 
+    group_by(OPCION) |> 
+    summarise(
+        total = n(),
+        in_ci = sum(in_ci),
+        not_in_ci = total - sum(in_ci),
+    ) |> 
+    mutate(
+        percent_in_ci = in_ci / total,
+        percent_not_in_ci = not_in_ci / total
+    )
+table_calibration
+
+# plot calibration with error bars. add obsered ratio as point estimate. color not_in_ci in red
+table_aux  <- df_bootstrap_combined_ratio_calibration |> 
+    inner_join(table_observed_ratios, by = "OPCION") |> 
+    mutate(
+        in_ci = ifelse(lower <= PERCENT_VOTOS & PERCENT_VOTOS <= upper, "yes", "no"),
+        rep = factor(as.integer(rep), ordered = TRUE)
+    ) 
+table_aux
+# graph for each OPCION group
+split(table_aux, table_aux$OPCION) |>
+    map(~ {
+        ggplot(.x, aes(x = rep, ymin = lower, ymax = upper, color = in_ci)) +
+            geom_errorbar(width = 0.2) +
+            geom_hline(aes(yintercept = PERCENT_VOTOS), color = "gray30", linetype = 2) +
+            theme_minimal() +
+            ggtitle(str_glue("Calibración de los intervalos de confianza al 95% para {first(.x$OPCION)}")) +
+            labs(x = "Opción", y = "Porcentaje de votos") +
+            scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+            scale_color_manual(values = c("yes" = "darkgreen", "no" = "darkred")) +
+            theme(legend.position = "none")
+    }) 
+
+#### exploratory analysis for null votes ####
+# from the df_muestra_by_polling_booth, do an eda for null votes
+df_muestra |> glimpse()
+
+#### explore by percentage by poll booth 
+df_muestra |> 
+    group_by(ESTRATO, ID_CASILLA) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    ungroup() |>
+    ggplot(aes(x = PERCENT_NULL)) +
+    geom_histogram(bins = 30, fill = "steelblue", color = "black", alpha = 0.5) +
+    geom_density(color = "blue") +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Histograma de porcentaje de votos nulos por casilla") +
+    labs(x = "Porcentaje de votos nulos", y = "Densidad")
+
+df_muestra |> 
+    group_by(ESTRATO, ID_CASILLA) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    ungroup() |>
+    ggplot(aes(x = PERCENT_NULL)) +
+    geom_boxplot(fill = "steelblue", color = "black", alpha = 0.5) +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Caja y brazos de porcentaje de votos nulos por casilla") +
+    labs(x = "Porcentaje de votos nulos", y = "") +
+    
+
+
 
 
 
