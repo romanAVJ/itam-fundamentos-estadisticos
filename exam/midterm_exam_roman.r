@@ -37,6 +37,8 @@ ggplot(aes(material, desgaste, color = material, group = )) +
 decrypt("sD0f gCdC En JP2EdEPn 8F")
 
 # answer: we have a significance of 1/20: 0.05
+# i did not see any difference between the materials!!
+# i would not reject the null hypothesis that there is no difference between the materials
 
 #### part 2: create permutation test between means of materials
 # H0: there is no difference between the means of the materials
@@ -362,6 +364,21 @@ split(table_aux, table_aux$OPCION) |>
             theme(legend.position = "none")
     }) 
 
+# I observe that the intervals are not well calibrated. The observed ratio is not in the confidence interval
+# This could be because the sample is baised by Null votes which are not observed (people that didn't went to vote). I would try to do a stratified sampling by null votes
+# observe distributions of Opcion (violin plot + boxplot)
+df_bootstrap_combined_ratio_calibration |> 
+    ggplot(aes(x = OPCION, y = mean)) +
+    geom_violin(aes(fill = OPCION), alpha = 0.5) +
+    geom_boxplot(alpha = 0.5) +
+    theme_minimal() +
+    ggtitle("Distribución de las razones combinadas de votos") +
+    labs(x = "Opción", y = "Porcentaje de votos") +
+    coord_flip() +
+    theme(legend.position = "none")
+
+# actually they do not look very baised
+
 #### exploratory analysis for null votes ####
 # from the df_muestra_by_polling_booth, do an eda for null votes
 df_muestra |> glimpse()
@@ -378,9 +395,11 @@ df_muestra |>
     geom_density(color = "blue") +
     scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
     theme_minimal() +
-    ggtitle("Histograma de porcentaje de votos nulos por casilla") +
+    ggtitle("Histograma de porcentaje de votos nulos", "Por casilla") +
     labs(x = "Porcentaje de votos nulos", y = "Densidad")
 
+
+# is ok
 df_muestra |> 
     group_by(ESTRATO, ID_CASILLA) |>
     summarise(
@@ -391,21 +410,156 @@ df_muestra |>
     geom_boxplot(fill = "steelblue", color = "black", alpha = 0.5) +
     scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
     theme_minimal() +
-    ggtitle("Caja y brazos de porcentaje de votos nulos por casilla") +
-    labs(x = "Porcentaje de votos nulos", y = "") +
-    
+    ggtitle("Caja y brazos de porcentaje de votos nulos", "Por casilla") +
+    labs(x = "Porcentaje de votos nulos", y = "") 
+
+# i liked more this viz
+df_muestra |> 
+    group_by(ESTRATO, ID_CASILLA) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    ungroup() |>
+    ggplot(aes(x = PERCENT_NULL)) +
+    stat_ecdf() +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Distribución acumulada", "Por casilla") +
+    labs(x = "Porcentaje de votos nulos", y = "") 
+
+#### explore by strata
+df_muestra |> 
+    group_by(ESTRATO) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    ungroup() |>
+    ggplot(aes(x = PERCENT_NULL)) +
+    geom_histogram(bins = 30, fill = "steelblue", color = "black", alpha = 0.5) +
+    geom_density(color = "blue") +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Histograma de porcentaje de votos nulos", "Por estrato") +
+    labs(x = "Porcentaje de votos nulos", y = "Densidad")
+
+# is ok
+df_muestra |> 
+    group_by(ESTRATO) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    ungroup() |>
+    ggplot(aes(x = PERCENT_NULL)) +
+    geom_boxplot(fill = "steelblue", color = "black", alpha = 0.5) +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Caja y brazos de porcentaje de votos nulos", "Por estrato") +
+    labs(x = "Porcentaje de votos nulos", y = "")
+
+# i liked more this viz
+df_muestra |> 
+    group_by(ESTRATO) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    ungroup() |>
+    ggplot(aes(x = PERCENT_NULL)) +
+    stat_ecdf() +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Distribución acumulada", "Por estrato") +
+    labs(x = "Porcentaje de votos nulos", y = "")
+
+#### explore by type of polling booth
+table_null_by_type_poll_booth  <- df_muestra |> 
+    group_by(TIPO_CASILLA) |> 
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    )
+knitr::kable(
+    table_null_by_type_poll_booth, digits = 4, 
+    format.args = list(big.mark = ",", decimal.mark = ".", format = "f"), 
+    caption = "Tabla de porcentaje de votos nulos por tipo de casilla"
+    )
+
+#### by state
+df_muestra |> 
+    group_by(ID_ESTADO) |> 
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |> 
+    arrange(ID_ESTADO) |>
+    # col plot
+    ggplot(aes(ID_ESTADO, PERCENT_NULL)) +
+    geom_col(fill = "steelblue", color = "black", alpha = 0.5) +
+    geom_text(aes(label = scales::percent(PERCENT_NULL, accuracy = 1)), vjust = -0.5) +
+    theme_minimal() +
+    ggtitle("Porcentaje de votos nulos por estado") +
+    labs(x = "Estado", y = "Porcentaje de votos nulos")
+
+#### relationship between null votes and total votes (scatter + loess)
+df_muestra |> 
+    group_by(ESTRATO, ID_CASILLA) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL),
+        TOTAL = sum(TOTAL)
+    ) |> 
+    ungroup() |> 
+    ggplot(aes(x = TOTAL, y = PERCENT_NULL)) +
+    geom_point(color = "steelblue", alpha = 0.5) +
+    geom_smooth(method = "loess", color = "darkred", se = FALSE) +
+    scale_x_continuous(labels = scales::comma, trans = "log2") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1), trans = "sqrt") +
+    theme_minimal() +
+    ggtitle("Porcentaje de votos nulos vs total de votos", "Por casilla") +
+    labs(x = "Total de votos", y = "Porcentaje de votos nulos")
+
+# there is something weird with the tendency of the loess.
+# looks like the simpson paradox. there are "groups" of casillas with downward tendency
+# but the overall tendency is upward (see the loess)
+
+# My shot is that there is more tendency to observe less null votes in casillas with more total votes
+# by the law of large numbers
+# Also by the fact that there is an ubserverd variable that is the number of voters which didnt went
+# to vote and could reflect the real tendency of null votes
 
 
+#### relationship between null votes and time (by minutes)
+df_muestra |> 
+    mutate(
+        TIMESTAMP = str_c(ANIO, MES, DIA, HORA, MINUTOS, sep = "-") |> 
+            lubridate::ymd_hm()
+    ) |> 
+    group_by(TIMESTAMP) |>
+    summarise(
+        PERCENT_NULL = sum(NULOS) / sum(TOTAL)
+    ) |>
+    ggplot(aes(x = TIMESTAMP, y = PERCENT_NULL)) +
+    geom_point(color = "steelblue", alpha = 0.5) +
+    geom_smooth(method = "loess", color = "darkred", se = FALSE) +
+    scale_x_datetime(date_breaks = "1 hour", date_labels = "%H:%M") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_minimal() +
+    ggtitle("Porcentaje de votos nulos vs tiempo", "Por casilla") +
+    labs(x = "Tiempo", y = "Porcentaje de votos nulos")
 
+# there doesnt seem to be a relationship between null votes and time but some outliers    
 
+# notes about outliers #
+# There are two big outlier groups: the ones which are zero and the ones bigger than 25% (to say a number)
+# It could be that the ones which are zero are casillas with very few voters and the ones bigger than 25%
+# are atypical casillas with a lot of null votes
 
+# the second thing is that there are some states: cdmx, edo mex and veracruz who have an atypical behavior
+# with respect to rest of the states
 
+# about handling outliers #
+# I would first analyze which states and poll booths have 0 null votes ore more than 25% null votes.
+# For the first group, I would try to unbais by inputating the null votes with a sample of poll booths with percent of
+# null votes greater than 0
+# For the second group, I would try to do a separete analysis for those states and poll booths (the ones greater than 25%)
 
-
-
-
-
-
-
-
-
+# Indepently of the method, it is true that this outliers of the "conteo rapido" bais the results. Maybe it will be appropiate
+# to use a different statistical perspective, like bayesian inference, to handle this outliers with prior information.
+# For example, we could use the results of the last election to inputate the null votes of the "conteo rapido" of this election
+# and update the prior with the results of the "conteo rapido" of this election
