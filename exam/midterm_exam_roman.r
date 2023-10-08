@@ -241,7 +241,7 @@ svy_boot  <- function(df_population, df_sample){
 
 # generate bootstrap samples
 set.seed(SEED)
-N_BOOT  <- 250
+N_BOOT  <- 1000
 df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_computos, df_muestra))
 df_bootstrap_combined_ratio
 # get normal confidence interval at 95%
@@ -295,7 +295,7 @@ table_se_combined_ratio |>
 # from df_muestra get 50 samples of size M = length(df_muestra)
 # and apply svy_boot to each sample
 set.seed(SEED)
-N_BOOT  <- 250
+N_BOOT  <- 1000
 N_CI  <- 50
 M  <- 1745 # same as the sample size of df_muestra
 
