@@ -230,7 +230,7 @@ svy_boot  <- function(df_population, df_sample){
         group_split(ESTRATO) |> 
         map_df(~ slice_sample(
             .x, 
-            n = max(first(.x$n) - 1, 1), # rao & wu say to sample n - 1
+            n = first(.x$n), 
             replace = TRUE)
         )
 
@@ -254,7 +254,7 @@ table_se_combined_ratio  <- df_bootstrap_combined_ratio |>
     summarise(
         mean = mean(combined_ratio), 
         sd = sd(combined_ratio), 
-        lower = mean - Z_ALPHA * sd, 
+        lower = mean - Z_ALPHA * sd,
         upper = mean + Z_ALPHA * sd
     ) |> 
     mutate(longitud = upper - lower)
@@ -265,6 +265,7 @@ table_se_combined_ratio |>
         format.args = list(big.mark = ",", decimal.mark = ".", format = "f"), 
         caption = "Intervalos de confianza al 95% para las razones combinadas de votos"
         )
+
 
 # get observed ratios
 table_observed_ratios  <- df_computos |> 
@@ -277,6 +278,18 @@ table_observed_ratios  <- df_computos |>
         PERCENT_VOTOS = VOTOS / sum(VOTOS),
     )
 table_observed_ratios
+
+# get relative bais
+table_se_combined_ratio |> 
+    inner_join(table_observed_ratios, by = "OPCION") |> 
+    mutate(
+        relative_bais = (mean - PERCENT_VOTOS) / sd
+    ) |> 
+    knitr::kable(
+        digits = 4, 
+        format.args = list(big.mark = ",", decimal.mark = ".", format = "f"), 
+        caption = "Tabla de sesgo relativo de las razones combinadas de votos"
+        )
 
 # plot confidence intervals. use error bars with lower and upper. use percent_votos as point estimate
 table_se_combined_ratio |> 
