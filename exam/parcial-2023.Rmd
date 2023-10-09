@@ -22,7 +22,8 @@ y el código comentado.
 * Si tienes preguntas puedes escribirlas en el anuncio de canvas del examen.
 
 ```{r setup, include=FALSE}
-# knitr::opts_chunk$set(echo = TRUE, warning=FALSE, error=TRUE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, error=TRUE, message = FALSE)
+
 library(tidyverse)
 library(nullabor)
 
@@ -31,13 +32,15 @@ SEED <- 8
 
 ## Pruebas de hipótesis
 
-Nos solicitan hacer un análisis con el objetivo de probar un material nuevo para suela de zapatos (el material B) y ver si es comparable con el material que se usa normalmente (el material A).
+Nos solicitan hacer un análisis con el objetivo de probar un material nuevo 
+para suela de zapatos (el material B) y ver si es comparable con el material
+que se usa normalmente (el material A).
 
 Nos dan el siguiente conjunto de datos:
 
 ```{r}
+
 # read data 
-setwd("/Users/ravj/Documents/study/ITAM-MASTER/sem1/stats/itam-fundamentos-estadisticos/exam") # remove!
 df_shoes  <- read_csv("datos/zapatos-1.csv")
 
 # look data #
@@ -48,6 +51,7 @@ df_shoes |> glimpse()
 nivel de significancia de la prueba?).
 
 ```{r}
+
 set.seed(SEED)
 lineup(
     method = null_permute("material"),
@@ -70,15 +74,20 @@ ggplot(aes(material, desgaste, color = material)) +
 ```{r}
 decrypt("sD0f gCdC En JP2EdEPn ZY")
 ```
+H0 = No existe diferencia en la diferencia de medias del desgaste de los
+materiales.
+H1 = Existe una diferencia entre las medias de los materiales, en ambas 
+direcciones.
 
-Significancia de 1/20 = 0.05. No rechazo $\mathcal{H}_{0}$.
+Visulamente no podemos reconocer la gráfica con los datos originales, optamos 
+por la 11 o 12 y en realidad con el decrypt vimos que estaba en la posición 3. 
+Con un nivel de significancia de 1/20 = 0.05. No existe suficiente evidencia para 
+rechazar $\mathcal{H}_{0}$.
 
 
 2. Realiza una prueba de permutaciones para la diferencia de las medias, escribe la hipótesis nula, la hipótesis alterna y tus conclusiones.
 
 ```{r}
-# H0: there is no difference between the means of the materials
-# H1: there is a difference between the means of the materials, bothways !!! comment in markdown
 
 # permutation test
 set.seed(SEED)
@@ -123,6 +132,17 @@ df_material_perm |>
     labs(x = "Diferencia de medias", y = "Densidad")
 
 ```
+Se realiza una prueba de permutaciones para la diferencia de las medias. 
+
+H0 = No existe diferencia en la diferencia de medias del desgaste de los
+materiales.
+
+H1 = Existe una diferencia entre las medias de los materiales, en ambas 
+direcciones. 
+
+El valor-p de esta prueba de hipótesis es 0.706 por lo que no existe suficiente 
+evidencia para rechazar H0. Por lo que no podemos decir que existe una 
+diferencia entre las medias de los materiales A y B. 
 
 
 3. Después de discutir con los responsables del proyecto descubrimos que nos 
@@ -131,7 +151,7 @@ faltaba conocer detalles del proceso generador de datos: el experimento se reali
 tus conclusiones?
 
 ```{r}
-setwd("/Users/ravj/Documents/study/ITAM-MASTER/sem1/stats/itam-fundamentos-estadisticos/exam") # remove!
+
 # read data
 df_shoes2  <- read_csv("datos/zapatos-2.csv")
 df_shoes2 |> glimpse()
@@ -177,6 +197,18 @@ df_material_perm2 |>
     ggtitle("Prueba de permutación", "Control por niño") +
     labs(x = "Diferencia en medias", y = "Densidad")
 ```
+
+Al cambiar el proceso generador de datos, cambia la manera de hacer la prueba 
+de hipótesis. Se trata de un caso de prueba de permutaciones para muestras 
+pareadas. Es decir, debemos verificar para cada niño la diferencia de medias, 
+ya que todos los niños tienen ambos materiales.  
+
+Al realizar la prueba de poermutaciones podemos observar que el nuevo valor-p
+para el caso de prueba pareada es de 0.01, por lo que existe suficiente 
+evidencia para rechazar Ho. 
+
+En conclusión para el caso de pruebas pareadas, existe una diferencia 
+entre las medias del desgaste de los materiales. 
 
 
 ## Bootstrap
@@ -243,8 +275,8 @@ Necesitarás los siguientes datos:
 * Muestra del conteo rápido usada en la estimación [aquí](https://ine.mx/conteo-rapido-consulta-popular-2021/)
 
 ```{r}
+
 #### read data ####
-setwd("/Users/ravj/Documents/study/ITAM-MASTER/sem1/stats/itam-fundamentos-estadisticos/exam") # remove!
 
 # preprocesamiento de tablas de datos
 df_computos <- read_delim("datos/20210802-2130_INE-CONSULTA-POPULAR-2021/20210802-2130_COMPUTOS-INE-CP2021.csv", 
@@ -271,6 +303,7 @@ df_muestra <- read_delim("https://ine.mx/wp-content/uploads/2021/08/Conteos-Cons
 
 
 ```{r}
+
 # create a bootstrap function to get the combined ratio of votes 
 get_combined_ratio  <- function(df_population, df_sample){
     # setp 0: get Nh / nh
@@ -309,7 +342,10 @@ knitr::kable(
     )
 ```
 
-
+El estimador de razón combinado para muestreo estratificado (proporcion o gorrro) es:
+0.0148 para el caso de "NO".
+0.0557 para el caso de "NULOS".
+0.9295 para el caso de "SI". 
 
 2. Utiliza **bootstrap** para calcular el error estándar, y reporta tu 
 estimación del error.
@@ -320,6 +356,7 @@ estimación del error.
     dentro de cada estrato.
     
 ```{r}
+
 # create bootstrap function
 svy_boot  <- function(df_population, df_sample){
     # get sample of polling booths BY ESTRATO
@@ -345,10 +382,12 @@ df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_computos, df_mue
 df_bootstrap_combined_ratio
 ```
 
+
 3. Construye un intervalo del 95% de confianza utilizando el método normal. Revisa 
 si el supuesto de normalidad es razonable.
 
 ```{r}
+
 # get normal confidence interval at 95%
 ALPHA  <- 0.05
 Z_ALPHA  <- qnorm(1 - ALPHA / 2)
@@ -358,7 +397,7 @@ table_se_combined_ratio  <- df_bootstrap_combined_ratio |>
     group_by(OPCION) |> 
     summarise(
         mean = mean(combined_ratio), 
-        sd = sd(combined_ratio), 
+        sd = sd(combined_ratio), # error estándar 
         lower = mean - Z_ALPHA * sd,
         upper = mean + Z_ALPHA * sd
     ) |> 
@@ -377,6 +416,7 @@ table_se_combined_ratio |>
 describe que observas.
 
 ```{r}
+
 # get observed ratios
 table_observed_ratios  <- df_computos |> 
     rename(SI = OPINION_SI, NO = OPINION_NO) |>
@@ -403,6 +443,7 @@ table_se_combined_ratio |>
 
 
 ```{r}
+
 df_bootstrap_combined_ratio |> 
     group_split(OPCION) |> 
     map(~ {
@@ -416,20 +457,25 @@ df_bootstrap_combined_ratio |>
     })
 
 
-# Vemos que las colas no coinciden con las de la normal, para SI y NO 
-# son menores, mientras que para NULOS son mayores. Adicionalmente tenemos 
-# un sesgo relativo al error estándar alto para NO NULOS y SI 
-# (-1.1779, 3.3236, -3.3243) por lo que no hace senrtido usar el método normal 
-# para el cálculo de intervalos de confianza. 
 
 ```
 
+En las gráficas de QQ-plot vemos que las colas no coinciden con las de la 
+distribución de referencia normal. Para las opciones "NO" y "NULOS, las colas
+se encuentran por encima de la normal, con mayor dispersión. Mientras que para
+"SI" las colas están por debajo de la normal también, con mayor dispersión.
+
+Adicionalmente tenemos un sesgo relativo al error estándar alto para "NO"
+"NULOS" y "SI" (-1.1779, 3.3236, -3.3243) por lo que el método normal para 
+el cálculo de intervalos de confianza no parece ser el más adecuado en caso de 
+queres estimar en las colas.
 
 5. ¿Tus intervalos contienen los valores observados en los cómputos? Explica los
 resultados observados.
 
 
 ```{r}
+
 # plot confidence intervals. use error bars with lower and upper. use percent_votos as point estimate
 table_se_combined_ratio |> 
     inner_join(table_observed_ratios, by = "OPCION") |> 
@@ -443,10 +489,15 @@ table_se_combined_ratio |>
     coord_flip() +
     theme(legend.position = "none")
 
-# 
+
 
 
 ```
+En la gráfica anterior podemos observar que "percent_votos" no se encuentra
+dentro de los intervalos de confianza paea "SI" y "NULOS". Esto puede deberse a 
+que los datos no siguen una distribución que se ajuste bien a los supuestos del 
+método normal para calcular el intervalo de confianza, por ende intervalo
+resultante puede ser inexacto.
 
 
 #### Calibración
@@ -462,6 +513,7 @@ verdadero valor observado. Describe tus observaciones y compara con el intervalo
 obtenido en el ejercicio anterior.
 
 ```{r}
+
 # from df_population get 50 samples of size M = length(df_muestra)
 # and apply svy_boot to each sample
 set.seed(SEED)
@@ -523,8 +575,22 @@ table_calibration |>
         )
 ```
 
+En la tabla anterior vemos que los intervalos no tienen la cobertura real
+esperada por lo que no están bien calibrados. 
+La proporción observada no se encuentra dentro del intervalo de confianza.
+Esto podría deberse a que la muestra está sesgada por votos nulos y 
+probablemente a que no se cumple el supuesto de distribución 
+simétrica con colas no muy largas. 
+
+Intentaría realizar un muestreo estratificado según los votos nulos para 
+abordar el posible sesgo en los datos relacionado con los votos nulos o 
+utilizar el método de percentiles para el cálculo de 
+los intervalos de confianza.
+
+
 
 ```{r}
+
 # plot calibration with error bars. add obsered ratio as point estimate. color not_in_ci in red
 table_aux  <- df_bootstrap_combined_ratio_calibration |> 
     inner_join(table_observed_ratios, by = "OPCION") |> 
@@ -547,11 +613,6 @@ split(table_aux, table_aux$OPCION) |>
             theme(legend.position = "none")
     }) 
 
-
-# I observe that the intervals are not well calibrated. The observed ratio is not in the confidence interval
-# This could be because the sample is biased by Null votes. I would try to do a stratified sampling by null votes.
-
-# observe distributions of Opcion (violin plot + boxplot)
 ```
 
 #### Análisis Exploratorio
@@ -559,8 +620,8 @@ split(table_aux, table_aux$OPCION) |>
 Un voto nulo corresponde a una boleta donde el ciudadano acudió a las urnas
 y anuló su voto. 
 
-Antes de contestar los siguiente incisos piensen que rango esperarían ver para la
-proporción de votos nulos en una casilla.
+Antes de contestar los siguiente incisos piensen que rango esperarían ver para 
+la proporción de votos nulos en una casilla.
 
 * Describe la distribución de datos nulos en la muestra, y como se relaciona con 
 el total de votos, realiza gráficas y describe tus observaciones.
@@ -570,6 +631,7 @@ crees que sea la razón de estas observaciones extremas? ¿consideras que se
 deben eliminar de la muestra antes de realizar la estimación?
 
 ```{r}
+
 #from the df_muestra, do an eda for null votes
 df_muestra |> glimpse()
 
@@ -589,6 +651,11 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "Densidad")
 ```
 
+La gráfica anterior representa la distribución del porcentaje de votos nulos 
+por casilla, identificadas por las columnas "ESTRATO" y "ID". Se destaca una
+distribución asimétrica, donde la mayoría de las casillas exhiben porcentajes
+bajos o insignificantes de votos nulos. No obstante, algunas casillas muestran
+porcentajes notablemente elevados de votos nulos, superando el 50% por casilla.
 
 ```{r}
 # is ok
@@ -606,9 +673,19 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "")
 ```
 
+La gráfica de caja y brazos ilustra una distribución de datos altamente
+concentrada en valores pequeños, con cierta variabilidad en los
+valores y la presencia de varios valores atípicos. Esta concentración en valores
+pequeños sugiere que, aunque prevalece una tendencia hacia la uniformidad en los
+datos, con la mayoría de las observaciones siendo pequeñas o de baja magnitud,
+existen casillas particulares de interés debido a que muestran más del 50% de 
+votos nulos.
+
+
+
 
 ```{r}
-# i liked more this viz
+
 df_muestra |> 
     group_by(ESTRATO, ID) |>
     summarise(
@@ -623,8 +700,14 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "")
 ```
 
+La gráfica de distribución acumulada muestra una alta concentración de datos en
+valores pequeños, indicando uniformidad en la mayoría de las observaciones.
+Sin embargo, también destaca la presencia de valores atípicos, que alteran la 
+distribución acumulada, ya que son especialmente notables por superar el 50% de
+la acumulación, y que son de interés particular en el análisis de los datos.
 
 ```{r}
+
 #### explore by strata
 df_muestra |> 
     group_by(ESTRATO) |>
@@ -659,8 +742,9 @@ df_muestra |>
 ```
 
 
+
 ```{r}
-# i liked more this viz
+
 df_muestra |> 
     group_by(ESTRATO) |>
     summarise(
@@ -675,8 +759,15 @@ df_muestra |>
     labs(x = "Porcentaje de votos nulos", y = "")
 ```
 
+Al analizar las gráficas a nivel de estrato, podemos notar patrones similares
+a los que observamos al hacerlo por casilla. En otras palabras, encontramos una 
+distribución de datos en la que la mayoría de los valores son pequeños o bajos 
+en magnitud, pero también identificamos la presencia de valores atípicos. 
+Este hallazgo sugiere la existencia de estratos específicos que son de 
+particular interés, ya que muestran más del 50% de votos nulos.
 
 ```{r}
+
 #### explore by type of polling booth
 table_null_by_type_poll_booth  <- df_muestra |> 
     group_by(TIPO_CASILLA) |> 
@@ -690,8 +781,10 @@ knitr::kable(
     )
 ```
 
+Al realizar el análisis por tipo de casilla B y C (Básica y Contigua), observamos que el porcentaje de votos nulos es significativamente diferente entre estos dos tipos. Tan solo el 1.21% de los votos son nulos en las casillas tipo B, mientras que en las casillas tipo C, el porcentaje de votos nulos es del 8.61%. Esto indica una diferencia marcada en la incidencia de votos nulos entre estos dos tipos de casillas.
 
 ```{r}
+
 #### by state
 df_muestra |> 
     group_by(ID_ESTADO) |> 
@@ -709,8 +802,19 @@ df_muestra |>
     coord_flip()
 ```
 
+Al analizar el porcentaje de votos nulos a nivel estatal, se observa que algunos estados muestran una concentración significativa de votos nulos. Por lo tanto, sería recomendable realizar un análisis más detallado a nivel estatal, lo que podría incluir el examen de datos históricos sobre preferencias partidarias u otros factores relevantes. Los estados que presentan los mayores porcentajes de votos nulos son los siguientes:
+
+Yucatán (Estado 31)
+Guanajuato (Estado 11)
+Jalisco (Estado 14)
+Oaxaca (Estado 20)
+Zacatecas (Estado 32)
+Veracruz (Estado 30)
+Estos estados destacan por su alto porcentaje de votos nulos y podrían ser objeto de un análisis más profundo para comprender mejor las razones detrás de esta tendencia.
+
 
 ```{r}
+
 #### relationship between null votes and total votes (scatter + loess)
 df_muestra |> 
     group_by(ESTRATO, ID) |>
@@ -728,16 +832,23 @@ df_muestra |>
     ggtitle("Porcentaje de votos nulos vs total de votos", "Por casilla") +
     labs(x = "Total de votos", y = "Porcentaje de votos nulos")
 
-# there is something weird with the tendency of the loess.
-# looks like the simpson paradox. there are "groups" of casillas with downward tendency
-# but the overall tendency is upward (see the loess)
-
-# My shot is that there is more tendency to observe less null votes in casillas with more total votes
-# by the law of large numbers
-# Also by the fact that there is an ubserverd variable that is the number of voters which didnt went
-# to vote and could reflect the real tendency of null votes
 ```
+Observamos una peculiaridad en la tendencia que muestra el modelo LOESS. 
+Se asemeja a lo que se conoce como la "paradoja de Simpson". En este contexto, 
+identificamos "grupos" de casillas que muestran una tendencia descendente, 
+mientras que, en general, la tendencia es ascendente, como se visualiza en el modelo LOESS.
 
+Nuestra hipótesis es que existe una mayor propensión a observar menos votos
+nulos en casillas con un mayor número total de votos. Esto podría explicarse 
+mediante la aplicación de la Ley de los Grandes Números, que sugiere que a
+medida que aumenta el tamaño de la muestra (en este caso, el número de 
+votantes), las tendencias se vuelven más consistentes.
+
+Adicionalmente, es posible que haya una variable no observada,
+conocida como "Omitted Variable Bias" (sesgo por variable omitida), 
+como el número de votantes que no acudió a votar, la cual podría estar
+reflejando la verdadera tendencia de votos nulos y debería ser considerada 
+en nuestro análisis.
 
 ```{r}
 #### relationship between null votes and time (by minutes)
@@ -781,6 +892,44 @@ df_muestra |>
 # and update the prior with the results of the "conteo rapido" of this election
 
 ```
+
+No parece existir una relación clara entre los votos nulos y el factor temporal,
+sin embargo, identificamos la presencia de valores atípicos que requieren 
+nuestra atención.
+
+Consideraciones sobre los valores atípicos:
+Destacamos dos grupos significativos de valores atípicos: aquellos que se 
+sitúan en cero y aquellos que superan el 25% (aproximadamente). Los valores
+nulos iguales a cero posiblemente corresponden a casillas con una cantidad 
+muy reducida de votantes, mientras que aquellos que superan el 25% podrían 
+indicar casillas inusuales con un número considerable de votos nulos.
+
+Además, observamos un comportamiento inusual en algunos estados, como la Ciudad
+de México (CDMX), el Estado de México (Edo Mex) y Veracruz, en comparación con
+el resto de los estados.
+
+En cuanto a la gestión de los valores atípicos:
+En primer lugar, sugiero llevar a cabo un análisis detallado para identificar
+los estados y las casillas electorales que registran valores nulos iguales a 
+cero o superiores al 25%. Para el primer grupo, podríamos considerar mitigar el
+sesgo imputando los votos nulos utilizando una muestra de casillas con un 
+porcentaje de votos nulos mayor que cero.
+
+Para el segundo grupo, deberíamos explorar la posibilidad de realizar un
+análisis por separado para aquellos estados y casillas electorales que superan
+el 25% de votos nulos.
+
+Independientemente del enfoque seleccionado, es importante reconocer
+que estos valores atípicos en el "conteo rápido" pueden influir en los 
+resultados. Por lo tanto, podría ser adecuado adoptar una perspectiva
+estadística diferente, como la inferencia bayesiana, para abordar estos valores 
+atípicos mediante la incorporación de información previa. Por ejemplo, 
+podríamos utilizar los resultados de la elección anterior para imputar 
+los votos nulos del "conteo rápido" de la presente elección y actualizar esta
+información previa con los resultados actuales del "conteo rápido".
+
+
+
 
 
 
