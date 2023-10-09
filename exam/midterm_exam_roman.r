@@ -26,7 +26,7 @@ lineup(
 mutate(
     material = factor(material)
 ) |> 
-ggplot(aes(material, desgaste, color = material, group = )) +
+ggplot(aes(material, desgaste, color = material)) +
     geom_boxplot() +
     facet_wrap(~.sample, nrow = 4) +
     theme_minimal() +
