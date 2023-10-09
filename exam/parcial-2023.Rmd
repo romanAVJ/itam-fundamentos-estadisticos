@@ -47,8 +47,8 @@ df_shoes  <- read_csv("datos/zapatos-1.csv")
 df_shoes |> glimpse() 
 ```
 
-1. Realiza una prueba de hipótesis visual y describe tus conclusiones (cuál es el
-nivel de significancia de la prueba?).
+1. Realiza una prueba de hipótesis visual y describe tus conclusiones (cuál es
+elnivel de significancia de la prueba?).
 
 ```{r}
 
@@ -81,11 +81,12 @@ direcciones.
 
 Visulamente no podemos reconocer la gráfica con los datos originales, optamos 
 por la 11 o 12 y en realidad con el decrypt vimos que estaba en la posición 3. 
-Con un nivel de significancia de 1/20 = 0.05. No existe suficiente evidencia para 
-rechazar $\mathcal{H}_{0}$.
+Con un nivel de significancia de 1/20 = 0.05. No existe suficiente evidencia
+para rechazar H0.
 
 
-2. Realiza una prueba de permutaciones para la diferencia de las medias, escribe la hipótesis nula, la hipótesis alterna y tus conclusiones.
+2. Realiza una prueba de permutaciones para la diferencia de las medias, 
+escribe la hipótesis nula, la hipótesis alterna y tus conclusiones.
 
 ```{r}
 
@@ -122,11 +123,14 @@ cat("p-value: ", p_value, "\n")
 # plot diff means in histogram and add density plot add original diff means
 df_material_perm |> 
     ggplot(aes(diff_mean_wear)) +
-    geom_rect(aes(xmax = Inf, xmin = stat_diff_means, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+    geom_rect(aes(xmax = Inf, xmin = stat_diff_means, ymin = 0, ymax = Inf),
+              fill = "pink", alpha = 0.01) +
     geom_vline(xintercept = stat_diff_means, color = "darkred", size = 1.5) +
-    geom_histogram(aes(y = ..density..), bins = 30, fill = "steelblue", color = "black", alpha = 0.5) +
+    geom_histogram(aes(y = ..density..), bins = 30, fill = "steelblue",
+                   color = "black", alpha = 0.5) +
     geom_density(color = "blue") +
-    annotate("text", x = -2, y = 0.4, label = str_glue("pval: {p_value}"), color = "darkred") +
+    annotate("text", x = -2, y = 0.4, label = str_glue("pval: {p_value}"),
+             color = "darkred") +
     theme_minimal() +
     ggtitle("Prueba de permutación") +
     labs(x = "Diferencia de medias", y = "Densidad")
@@ -146,9 +150,11 @@ diferencia entre las medias de los materiales A y B.
 
 
 3. Después de discutir con los responsables del proyecto descubrimos que nos 
-faltaba conocer detalles del proceso generador de datos: el experimento se realizó asignando al azar un material a uno de sus zapatos y el otro material al otro zapato de cada niño.
-¿Cómo incorporas esta información en tu prueba de hipótesis del inciso 2? ¿Cambian
-tus conclusiones?
+faltaba conocer detalles del proceso generador de datos: el experimento se
+realizó asignando al azar un material a uno de sus zapatos y el otro material 
+al otro zapato de cada niño.
+¿Cómo incorporas esta información en tu prueba de hipótesis del inciso 2? 
+¿Cambian tus conclusiones?
 
 ```{r}
 
@@ -188,11 +194,14 @@ cat("p-value: ", p_value, "\n")
 # plot diff means in histogram and add density plot add original diff means
 df_material_perm2 |> 
     ggplot(aes(diff_mean_wear)) +
-    geom_rect(aes(xmax = Inf, xmin = stat_diff_means, ymin = 0, ymax = Inf), fill = "pink", alpha = 0.01) +
+    geom_rect(aes(xmax = Inf, xmin = stat_diff_means, ymin = 0, ymax = Inf),
+              fill = "pink", alpha = 0.01) +
     geom_vline(xintercept = stat_diff_means, color = "darkred", size = 1.5) +
-    geom_histogram(aes(y = ..density..), bins = 30, fill = "steelblue", color = "black", alpha = 0.5) +
+    geom_histogram(aes(y = ..density..), bins = 30, fill = "steelblue",
+                   color = "black", alpha = 0.5) +
     geom_density(color = "blue") +
-    annotate("text", x = 0.3, y = 2, label = str_glue("pval: {round(p_value, 4)}"), color = "darkred") +
+    annotate("text", x = 0.3, y = 2,
+             label = str_glue("pval: {round(p_value, 4)}"), color = "darkred") +
     theme_minimal() +
     ggtitle("Prueba de permutación", "Control por niño") +
     labs(x = "Diferencia en medias", y = "Densidad")
@@ -288,7 +297,8 @@ df_computos <- read_delim("datos/20210802-2130_INE-CONSULTA-POPULAR-2021/2021080
             LISTA_NOMINAL = LISTA_NOMINAL_MRCP, 
             TOTAL = TOTAL_OPINIONES)
 
-df_muestra <- read_delim("https://ine.mx/wp-content/uploads/2021/08/Conteos-ConsPop21-Lista-MuestraCalculo.txt", delim = "|", skip = 1) |> 
+df_muestra <- read_delim("https://ine.mx/wp-content/uploads/2021/08/Conteos-ConsPop21-Lista-MuestraCalculo.txt",
+                         delim = "|", skip = 1) |> 
   mutate(
     ID_ESTADO = str_pad(ID_ESTADO, 2, pad = "0"),
     SECCION = str_pad(SECCION, 4, pad = "0"),
@@ -376,15 +386,17 @@ svy_boot  <- function(df_population, df_sample){
 # generate bootstrap samples
 set.seed(SEED)
 N_BOOT  <- 1000
-df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_computos, df_muestra))
+df_bootstrap_combined_ratio  <- map_dfr(1:N_BOOT, ~ svy_boot(df_computos, 
+                                                             df_muestra))
 
 # look bootstraps
 df_bootstrap_combined_ratio
+
 ```
 
 
-3. Construye un intervalo del 95% de confianza utilizando el método normal. Revisa 
-si el supuesto de normalidad es razonable.
+3. Construye un intervalo del 95% de confianza utilizando el método normal. 
+Revisa si el supuesto de normalidad es razonable.
 
 ```{r}
 
@@ -407,20 +419,22 @@ table_se_combined_ratio |>
     knitr::kable(
         digits = 4, 
         format.args = list(big.mark = ",", decimal.mark = ".", format = "f"), 
-        caption = "Intervalos de confianza al 95% para las razones combinadas de votos"
+        caption = "Intervalos de confianza al 95% para las razones combinadas
+        de votos"
         )
 
 ```
 
-4. Reporta tus intervalos en una tabla. Compara la longitud de los 3 intervalos y 
-describe que observas.
+4. Reporta tus intervalos en una tabla. Compara la longitud de los 3 intervalos
+y describe que observas.
 
 ```{r}
 
 # get observed ratios
 table_observed_ratios  <- df_computos |> 
     rename(SI = OPINION_SI, NO = OPINION_NO) |>
-    pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", values_to = "VOTOS") |> 
+    pivot_longer(c("SI", "NO", "NULOS"), names_to = "OPCION", 
+                 values_to = "VOTOS") |> 
     group_by(OPCION) |>
     summarise(VOTOS = sum(VOTOS)) |> 
     ungroup() |>
@@ -476,7 +490,9 @@ resultados observados.
 
 ```{r}
 
-# plot confidence intervals. use error bars with lower and upper. use percent_votos as point estimate
+# plot confidence intervals. use error bars with lower and upper.
+# use percent_votos as point estimate
+
 table_se_combined_ratio |> 
     inner_join(table_observed_ratios, by = "OPCION") |> 
     ggplot(aes(x = OPCION, y = PERCENT_VOTOS, ymin = lower, ymax = upper)) +
@@ -591,7 +607,8 @@ los intervalos de confianza.
 
 ```{r}
 
-# plot calibration with error bars. add obsered ratio as point estimate. color not_in_ci in red
+# plot calibration with error bars. add obsered ratio as point estimate.
+#color not_in_ci in red
 table_aux  <- df_bootstrap_combined_ratio_calibration |> 
     inner_join(table_observed_ratios, by = "OPCION") |> 
     mutate(
@@ -604,9 +621,11 @@ split(table_aux, table_aux$OPCION) |>
     map(~ {
         ggplot(.x, aes(x = rep, ymin = lower, ymax = upper, color = in_ci)) +
             geom_errorbar(width = 0.2) +
-            geom_hline(aes(yintercept = PERCENT_VOTOS), color = "gray30", linetype = 2) +
+            geom_hline(aes(yintercept = PERCENT_VOTOS), color = "gray30",
+                       linetype = 2) +
             theme_minimal() +
-            ggtitle(str_glue("Calibración de los intervalos de confianza al 95% para {first(.x$OPCION)}")) +
+            ggtitle(str_glue("Calibración de los intervalos de confianza 
+                             al 95% para {first(.x$OPCION)}")) +
             labs(x = "Opción", y = "Porcentaje de votos") +
             scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
             scale_color_manual(values = c("yes" = "darkgreen", "no" = "darkred")) +
@@ -781,7 +800,12 @@ knitr::kable(
     )
 ```
 
-Al realizar el análisis por tipo de casilla B y C (Básica y Contigua), observamos que el porcentaje de votos nulos es significativamente diferente entre estos dos tipos. Tan solo el 1.21% de los votos son nulos en las casillas tipo B, mientras que en las casillas tipo C, el porcentaje de votos nulos es del 8.61%. Esto indica una diferencia marcada en la incidencia de votos nulos entre estos dos tipos de casillas.
+Al realizar el análisis por tipo de casilla B y C (Básica y Contigua), 
+observamos que el porcentaje de votos nulos es significativamente diferente 
+entre estos dos tipos. Tan solo el 1.21% de los votos son nulos en las
+casillas tipo B, mientras que en las casillas tipo C, el porcentaje de votos 
+nulos es del 8.61%. Esto indica una diferencia marcada en la incidencia de 
+votos nulos entre estos dos tipos de casillas.
 
 ```{r}
 
@@ -802,7 +826,12 @@ df_muestra |>
     coord_flip()
 ```
 
-Al analizar el porcentaje de votos nulos a nivel estatal, se observa que algunos estados muestran una concentración significativa de votos nulos. Por lo tanto, sería recomendable realizar un análisis más detallado a nivel estatal, lo que podría incluir el examen de datos históricos sobre preferencias partidarias u otros factores relevantes. Los estados que presentan los mayores porcentajes de votos nulos son los siguientes:
+Al analizar el porcentaje de votos nulos a nivel estatal, se observa que 
+algunos estados muestran una concentración significativa de votos nulos. 
+Por lo tanto, sería recomendable realizar un análisis más detallado a nivel 
+estatal, lo que podría incluir el examen de datos históricos sobre preferencias
+partidarias u otros factores relevantes. Los estados que presentan los mayores 
+porcentajes de votos nulos son los siguientes:
 
 Yucatán (Estado 31)
 Guanajuato (Estado 11)
@@ -810,7 +839,10 @@ Jalisco (Estado 14)
 Oaxaca (Estado 20)
 Zacatecas (Estado 32)
 Veracruz (Estado 30)
-Estos estados destacan por su alto porcentaje de votos nulos y podrían ser objeto de un análisis más profundo para comprender mejor las razones detrás de esta tendencia.
+
+Estos estados destacan por su alto porcentaje de votos nulos y podrían ser 
+objeto de un análisis más profundo para comprender mejor las razones detrás de 
+esta tendencia.
 
 
 ```{r}
@@ -836,7 +868,8 @@ df_muestra |>
 Observamos una peculiaridad en la tendencia que muestra el modelo LOESS. 
 Se asemeja a lo que se conoce como la "paradoja de Simpson". En este contexto, 
 identificamos "grupos" de casillas que muestran una tendencia descendente, 
-mientras que, en general, la tendencia es ascendente, como se visualiza en el modelo LOESS.
+mientras que, en general, la tendencia es ascendente, como se visualiza en el
+modelo LOESS.
 
 Nuestra hipótesis es que existe una mayor propensión a observar menos votos
 nulos en casillas con un mayor número total de votos. Esto podría explicarse 
@@ -870,26 +903,6 @@ df_muestra |>
     ggtitle("Porcentaje de votos nulos vs tiempo", "Por casilla") +
     labs(x = "Tiempo", y = "Porcentaje de votos nulos")
 
-# there doesnt seem to be a relationship between null votes and time but some outliers    
-
-# notes about outliers #
-# There are two big outlier groups: the ones which are zero and the ones bigger than 25% (to say a number)
-# It could be that the ones which are zero are casillas with very few voters and the ones bigger than 25%
-# are atypical casillas with a lot of null votes
-
-# the second thing is that there are some states: cdmx, edo mex and veracruz who have an atypical behavior
-# with respect to rest of the states
-
-# about handling outliers #
-# I would first analyze which states and poll booths have 0 null votes ore more than 25% null votes.
-# For the first group, I would try to unbias by inputating the null votes with a sample of poll booths with percent of
-# null votes greater than 0. 
-# For the second group, I would try to do a separete analysis for those states and poll booths (the ones greater than 25%)
-
-# Indepently of the method, it is true that this outliers of the "conteo rapido" bias the results. Maybe it will be appropiate
-# to use a different statistical perspective, like bayesian inference, to handle this outliers with prior information.
-# For example, we could use the results of the last election to inputate the null votes of the "conteo rapido" of this election
-# and update the prior with the results of the "conteo rapido" of this election
 
 ```
 
