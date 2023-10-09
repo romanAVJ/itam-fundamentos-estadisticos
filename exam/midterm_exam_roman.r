@@ -223,6 +223,7 @@ get_combined_ratio  <- function(df_population, df_sample){
 # look if function works
 df_total_votes_by_optionv2  <- get_combined_ratio(df_computos, df_muestra) # is ok!
 df_total_votes_by_optionv2
+
 # create bootstrap function
 svy_boot  <- function(df_population, df_sample){
     # get sample of polling booths BY ESTRATO
