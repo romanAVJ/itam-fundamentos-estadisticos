@@ -1,0 +1,219 @@
+---
+title: "R Notebook"
+author: "Roman Alberto Velez Jimenez"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r r-setup}
+library(tidyverse)
+knitr::opts_chunk$set(echo = FALSE, error = TRUE, include = TRUE)
+```
+
+
+# Ejercicio 1: Verosimilitud
+
+## Pregunta 1.1: Qué es esta función
+Esta función devuelve la log verosimilitud de una distribución binomial $X ~ \text{Bin}(n, p)$ para el parámetro $p$ donde $X$ es si hay o no error, y $p$ representa la probabilidad de ese error. Para estimarlo, se observan $N$ datos, de los cuales $N_{\text{err}}$ contienen error. 
+
+
+```{r 1-vero}
+# create log likelihood
+bin_loglike <- function(n, n_err){
+  n_corr <- n - n_err
+  log_verosim <- function(p){
+    n_err * log(p) + n_corr * log(1-p)
+  }
+}
+
+# create some sim
+tibble(x = seq(0, 1, 0.001)) |> 
+  mutate(loglike = map_dbl(x, bin_loglike(n = 100, n_err = 25))) |> 
+  ggplot(aes(x, loglike)) +
+  geom_line()
+
+```
+
+## Pregunta 1.2: Construir con $N = 500$ y $N_{\text{err}} = 121$
+
+De qué parámetros depende esta ultima función? 
+**Respuesta:** *Está función depende de $N_{err}$, puesto que $N$ es fija. Los datos observados son $N_{err}$, que en este caso es 121.*
+
+```{r}
+# loglike
+tibble(x = seq(0, 1, 0.001)) |> 
+  mutate(loglike = map_dbl(x, bin_loglike(n = 500, n_err = 121))) |> 
+  ggplot(aes(x, loglike)) +
+  geom_line() +
+  geom_vline(xintercept = 121/500, color = "red") +
+  ggtitle("Log Verosimilitud", "N = 500; Errores = 121")
+```
+
+## 1.3: Usar MV
+
+Bajo la muestra $X = N_{\text{err}} =  121$ para $N = 500$, se encontrará $p$ vía máxima verosomilitud, es decir optimizando `loglike` para $X$ y $N$ fija.
+
+```{r}
+# optimize
+p_mlike <- optimize(
+  f = bin_loglike(n = 500, n_err = 121),
+  interval = c(0, 1), # support of p
+  maximum = TRUE # maximization
+)
+
+# print
+print(str_glue("Maxima verosimilitud, p: {round(p_mlike[[1]], 4)}"))
+```
+
+
+```{r}
+# create likelihood
+bin_like <- function(n, n_err){
+  n_corr <- n - n_err
+  log_verosim <- function(p){
+    exp(n_err * log(p) + n_corr * log(1-p))
+  }
+}
+
+# create some sim
+tibble(x = seq(0, 1, 0.001)) |> 
+  mutate(loglike = map_dbl(x, bin_like(n = 500, n_err = 121))) |> 
+  ggplot(aes(x, loglike)) +
+  geom_line() +
+  geom_vline(xintercept = p_mlike$maximum, color = "red") +
+  ggtitle("Verosimilitud", "N = 500; Errores = 121")
+```
+
+
+## 1.4: $N_{err} = 317$
+
+Se reptie el ejercicio para 317 errores.
+
+
+```{r}
+# optimize
+p_mlike <- optimize(
+  f = bin_loglike(n = 500, n_err = 317),
+  interval = c(0, 1), # support of p
+  maximum = TRUE # maximization
+)
+
+# print
+print(str_glue("Maxima verosimilitud, p: {round(p_mlike[[1]], 4)}"))
+
+# create some sim
+tibble(x = seq(0, 1, 0.001)) |> 
+  mutate(loglike = map_dbl(x, bin_like(n = 500, n_err = 317))) |> 
+  ggplot(aes(x, loglike)) +
+  geom_line() +
+  geom_vline(xintercept = p_mlike$maximum, color = "red") +
+  ggtitle("Verosimilitud", "N = 500; Errores = 317")
+```
+
+# Pregunta 2: Normal
+
+
+## 2.1: Escribir la verosimilitud para una muestra de tamaño $n$
+
+### Verosmilitud
+
+La verosimilitud para $X ~ \sim \mathcal{N}(\mu, \sigma)$ está dada por:
+$$\mathcal{L}(\mu, \sigma^2; \underline{x}) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(x_{i} - \mu)^2}{2\sigma^2}\right).$$
+
+### Log Versomilitud
+
+Por consiguiente, la log verosimilitud está dada por
+$$\ell(\mu, \sigma^2; \underline{x}) = \sum_{i}^{n}-\frac{1}{2}\log(2\pi\sigma^2) - \frac{(x_{i} - \mu)^2}{2\sigma^2}. = -n\log(\sigma) - \sum_{i}^{n}\frac{(x_{i} - \mu)^2}{2\sigma^2}$$
+Nótese que $\sqrt{2 \pi}$ desparece de $\ell$ ya que es una constante.
+
+
+## 2.2: Estimar $\mu$, $\sigma$
+
+Para ejemplificar MV para una normal, generamos su media y desviación estándar de forma aleatoria.
+
+```{r}
+set.seed(1234)
+m <- runif(1, 5, 10) # media entre 5 y 10
+desv_est <- runif(1, 0, 2) # desviación estándar entre 0 y 2
+
+#simulamos una muestra con la que trabajaremos.
+x <- rnorm(150, mean = m, sd = desv_est)
+
+# revisar datos
+qplot(x, geom = "histogram") + ggtitle("Histograma de la muestra X")
+
+```
+
+Mediante el método plug-in, encontramos sus parámetros
+```{r}
+xmean_plugin <- mean(x)
+xsigma_plugin <- sd(x)
+
+cat(str_glue("media plug in: {xmean_plugin}"))
+cat("\n")
+cat(str_glue("sigma plug in: {xsigma_plugin}"))
+```
+
+
+
+Mediante MV encontramos sus parámetros, fija la muestra $\underline{x}$.
+
+```{r}
+# create log likelihood
+normal_loglike <- function(x){
+  n <- length(x)
+  log_verosim <- function(params){
+    - n * log(params[2]) - sum((x - params[1])^(2) / (2 * params[2]^(2))) # 1: mu, 2: sigma
+  }
+}
+
+loglike_normx <- normal_loglike(x)
+
+# estimate mu & sigma
+normal_params_std <- optim(
+  par = c(0, 1), # standard normal
+  fn = loglike_normx,
+  control = list(fnscale = -1, maxit = 1000), # fn = -1 --> maximize
+  method = "Nelder-Mead"
+)
+
+
+cat(str_glue("media mv in: {normal_params_std$par[1]}"))
+cat("\n")
+cat(str_glue("sigma mv in: {normal_params_std$par[2]}"))
+```
+
+Los valores reales son
+```{r}
+cat(str_glue("media real in: {m}"))
+cat("\n")
+cat(str_glue("sigma real in: {desv_est}"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
